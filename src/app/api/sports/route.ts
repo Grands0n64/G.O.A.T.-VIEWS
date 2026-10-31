@@ -45,8 +45,6 @@ function normalize(event: any, source: (typeof SOURCES)[number]) {
     completed: state === "post",
     startTime: event.date ?? null,
     venue: competition?.venue?.fullName ?? null,
-    broadcast: competition?.broadcasts?.map((item: any) => item.names?.join(", ")).filter(Boolean).join(" · ") ?? null,
-    url: event.links?.find((link: any) => link.rel?.includes("summary"))?.href ?? null
   };
 }
 
@@ -75,7 +73,6 @@ export async function GET(request: NextRequest) {
   });
   return NextResponse.json({
     date,
-    source: "ESPN public scoreboard feeds",
     matches,
     liveCount: matches.filter((match: any) => match.live).length,
     completedCount: matches.filter((match: any) => match.completed).length,
