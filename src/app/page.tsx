@@ -1,6 +1,8 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Search, Star, Trophy, Tv, RefreshCw } from "lucide-react";\nimport MatchCentre from "./components/MatchCentre";\nimport CompetitionStandings from "./components/CompetitionStandings";
+import { Activity, Bell, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Search, Star, Trophy, Tv, RefreshCw } from "lucide-react";
+import MatchCentre from "./components/MatchCentre";
+import CompetitionStandings from "./components/CompetitionStandings";
 
 type Match = {
  id:string; sport:string; league:string; country:string; home:string; away:string;
