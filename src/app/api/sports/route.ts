@@ -1,28 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LEAGUES, type League } from "../../leagues";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 30;
 
-const SOURCES = [
-  { sport: "Football", path: "soccer/eng.1", league: "Premier League" },
-  { sport: "Football", path: "soccer/esp.1", league: "LaLiga" },
-  { sport: "Football", path: "soccer/ita.1", league: "Serie A" },
-  { sport: "Football", path: "soccer/ger.1", league: "Bundesliga" },
-  { sport: "Football", path: "soccer/fra.1", league: "Ligue 1" },
-  { sport: "Football", path: "soccer/uefa.champions", league: "UEFA Champions League" },
-  { sport: "Football", path: "soccer/uefa.europa", league: "UEFA Europa League" },
-  { sport: "Football", path: "soccer/usa.1", league: "MLS" },
-  { sport: "Football", path: "soccer/mex.1", league: "Liga MX" },
-  { sport: "Football", path: "soccer/bra.1", league: "Brazil Serie A" },
-  { sport: "Football", path: "soccer/arg.1", league: "Argentina Primera" },
-  { sport: "Basketball", path: "basketball/nba", league: "NBA" },
-  { sport: "Basketball", path: "basketball/wnba", league: "WNBA" },
-  { sport: "Hockey", path: "hockey/nhl", league: "NHL" },
-  { sport: "Baseball", path: "baseball/mlb", league: "MLB" },
-  { sport: "American Football", path: "football/nfl", league: "NFL" }
-] as const;
-
-function normalize(event: any, source: (typeof SOURCES)[number]) {
+function normalize(event: any, source: League) {
   const competition = event.competitions?.[0];
   const competitors = competition?.competitors ?? [];
   const home = competitors.find((team: any) => team.homeAway === "home") ?? competitors[0];
@@ -35,7 +18,7 @@ function normalize(event: any, source: (typeof SOURCES)[number]) {
     id: String(event.id),
     sport: source.sport,
     league: source.league,
-    country: event.season?.name ?? "",
+    country: source.country || event.season?.name || "",
     home: home.team?.displayName ?? home.team?.name ?? "Home",
     away: away.team?.displayName ?? away.team?.name ?? "Away",
     homeScore: home.score === undefined || home.score === null || home.score === "" ? null : Number(home.score),
@@ -44,8 +27,25 @@ function normalize(event: any, source: (typeof SOURCES)[number]) {
     live: state === "in",
     completed: state === "post",
     startTime: event.date ?? null,
-    venue: competition?.venue?.fullName ?? null,
+    venue: competition?.venue?.fullName ?? null
   };
+}
+
+async function loadLeague(source: League, compactDate: string) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${source.path}/scoreboard?dates=${compactDate}`, {
+      headers: { Accept: "application/json" },
+      next: { revalidate: 30 },
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`${source.league}: provider returned ${response.status}`);
+    const data = await response.json();
+    return (data.events ?? []).map((event: any) => normalize(event, source)).filter(Boolean);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -55,18 +55,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Date must use YYYY-MM-DD." }, { status: 400 });
   }
   const compactDate = date.replaceAll("-", "");
-  const sources = SOURCES.filter((source) => sportFilter === "All" || source.sport === sportFilter);
-  const results = await Promise.allSettled(sources.map(async (source) => {
-    const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${source.path}/scoreboard?dates=${compactDate}`, {
-      headers: { Accept: "application/json" },
-      next: { revalidate: 30 }
+  const sources = LEAGUES.filter((source) => sportFilter === "All" || source.sport === sportFilter);
+
+  // ask the leagues in groups so the provider is not hit with everything at once
+  const results: PromiseSettledResult<any[]>[] = [];
+  for (let i = 0; i < sources.length; i += 40) {
+    const group = sources.slice(i, i + 40);
+    results.push(...(await Promise.allSettled(group.map((source) => loadLeague(source, compactDate)))));
+  }
+
+  const seen = new Set<string>();
+  const matches = results
+    .flatMap((result) => (result.status === "fulfilled" ? result.value : []))
+    .filter((match: any) => {
+      const key = match.league + ":" + match.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
     });
-    if (!response.ok) throw new Error(`${source.league}: provider returned ${response.status}`);
-    const data = await response.json();
-    return (data.events ?? []).map((event: any) => normalize(event, source)).filter(Boolean);
-  }));
-  const matches = results.flatMap((result) => result.status === "fulfilled" ? result.value : []);
   const failed = results.filter((result) => result.status === "rejected").length;
+
   matches.sort((a: any, b: any) => {
     if (a.live !== b.live) return a.live ? -1 : 1;
     return String(a.startTime ?? "").localeCompare(String(b.startTime ?? ""));
