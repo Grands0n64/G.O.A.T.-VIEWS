@@ -3,16 +3,15 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-type Found = { url: string; source: "wikipedia" | "thesportsdb" } | null;
-const memory = new Map<string, Found>();
+type Rec = { photo: string | null; born?: string; nationality?: string; height?: string; done: boolean };
+const memory = new Map<string, Rec>();
 const UA = "GoatViews/1.0 (football scores site)";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const norm = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z\s'-]/g, " ").replace(/\s+/g, " ").trim();
 
-/* ---- source 1: Wikipedia (no key, generous limits) ---- */
-// string = photo url, null = no photo, undefined = could not check
+/* ---- Wikipedia: photos (no key, generous limits) ---- */
 async function fromWikipedia(name: string): Promise<string | null | undefined> {
   const base = name.trim().replace(/\s+/g, "_");
   for (const title of [base + "_(footballer)", base]) {
@@ -37,7 +36,7 @@ async function fromWikipedia(name: string): Promise<string | null | undefined> {
   return null;
 }
 
-/* ---- source 2: TheSportsDB (free key, about 30 requests a minute) ---- */
+/* ---- TheSportsDB: birth date, nationality, height (free key, about 30 requests a minute) ---- */
 let chain: Promise<unknown> = Promise.resolve();
 function throttled<T>(fn: () => Promise<T>): Promise<T> {
   const run = chain.then(async () => {
@@ -49,7 +48,9 @@ function throttled<T>(fn: () => Promise<T>): Promise<T> {
   return run;
 }
 
-async function fromSportsDb(name: string, team: string): Promise<string | null | undefined> {
+type Sdb = { photo: string | null; born?: string; nationality?: string; height?: string };
+// undefined = could not check (rate limited), null = player not found
+async function fromSportsDb(name: string, team: string): Promise<Sdb | null | undefined> {
   const clean = norm(name);
   const words = clean.split(" ");
   const queries = [clean];
@@ -69,8 +70,13 @@ async function fromSportsDb(name: string, team: string): Promise<string | null |
       const byTeam = list.find((x) => teamWord && norm(String(x.strTeam ?? "")).toLowerCase().includes(teamWord));
       const byName = list.find((x) => norm(String(x.strPlayer ?? "")).toLowerCase() === q.toLowerCase());
       const hit = byTeam ?? byName;
-      const url = hit ? hit.strCutout || hit.strThumb || hit.strRender || null : null;
-      if (url) return url;
+      if (!hit) continue;
+      return {
+        photo: hit.strCutout || hit.strThumb || hit.strRender || null,
+        born: hit.dateBorn || undefined,
+        nationality: hit.strNationality || undefined,
+        height: hit.strHeight || undefined
+      };
     } catch {
       return undefined;
     }
@@ -78,21 +84,32 @@ async function fromSportsDb(name: string, team: string): Promise<string | null |
   return null;
 }
 
-async function lookup(name: string, team: string, budget: { sportsDb: number }): Promise<string | null | undefined> {
+async function lookup(name: string, team: string, budget: { sportsDb: number }): Promise<Rec> {
   const key = norm(name).toLowerCase();
-  if (!key) return null;
-  if (memory.has(key)) return memory.get(key)?.url ?? null;
+  if (!key) return { photo: null, done: true };
+  const cached = memory.get(key);
+  if (cached?.done) return cached;
 
-  const wiki = await fromWikipedia(name);
-  if (typeof wiki === "string") { memory.set(key, { url: wiki, source: "wikipedia" }); return wiki; }
-  if (wiki === undefined) return undefined;
-
-  if (budget.sportsDb <= 0) return undefined; // try again on the next request
-  budget.sportsDb -= 1;
-  const sdb = await throttled(() => fromSportsDb(name, team));
-  if (typeof sdb === "string") { memory.set(key, { url: sdb, source: "thesportsdb" }); return sdb; }
-  if (sdb === null) { memory.set(key, null); return null; }
-  return undefined;
+  let rec: Rec = cached ?? { photo: null, done: false };
+  if (!rec.photo) {
+    const wiki = await fromWikipedia(name);
+    if (typeof wiki === "string") rec = { ...rec, photo: wiki };
+  }
+  if (budget.sportsDb > 0) {
+    budget.sportsDb -= 1;
+    const sdb = await throttled(() => fromSportsDb(name, team));
+    if (sdb !== undefined) {
+      rec = {
+        photo: rec.photo ?? sdb?.photo ?? null,
+        born: sdb?.born,
+        nationality: sdb?.nationality,
+        height: sdb?.height,
+        done: true
+      };
+    }
+  }
+  memory.set(key, rec);
+  return rec;
 }
 
 export async function POST(req: NextRequest) {
@@ -100,14 +117,14 @@ export async function POST(req: NextRequest) {
   try { body = await req.json(); } catch {}
   const players: { name: string; team: string }[] = Array.isArray(body?.players) ? body.players.slice(0, 30) : [];
   const budget = { sportsDb: 8 };
-  const photos: Record<string, string | null> = {};
+  const results: Record<string, Rec> = {};
 
   for (let i = 0; i < players.length; i += 10) {
     const chunk = players.slice(i, i + 10);
-    const results = await Promise.all(chunk.map((p) => lookup(String(p.name ?? ""), String(p.team ?? ""), budget)));
-    chunk.forEach((p, idx) => { if (results[idx] !== undefined) photos[p.name] = results[idx] as string | null; });
+    const recs = await Promise.all(chunk.map((p) => lookup(String(p.name ?? ""), String(p.team ?? ""), budget)));
+    chunk.forEach((p, idx) => { results[p.name] = recs[idx]; });
   }
-  return NextResponse.json({ photos }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ results }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // quick test in your browser: /api/player-photos?name=Cole%20Palmer&team=Chelsea
@@ -115,5 +132,6 @@ export async function GET(req: NextRequest) {
   const name = req.nextUrl.searchParams.get("name") ?? "";
   const team = req.nextUrl.searchParams.get("team") ?? "";
   const wiki = await fromWikipedia(name);
-  return NextResponse.json({ name, wikipedia: wiki ?? "check failed" });
+  const sdb = await fromSportsDb(name, team);
+  return NextResponse.json({ name, wikipedia: wiki ?? "check failed", sportsdb: sdb ?? "not found or limited" });
 }
