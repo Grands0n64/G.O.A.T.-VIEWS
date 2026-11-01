@@ -1,15 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { LEAGUES } from "../../leagues";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const paths: Record<string,string> = {
-  "Premier League":"soccer/eng.1", "LaLiga":"soccer/esp.1", "Serie A":"soccer/ita.1",
-  "Bundesliga":"soccer/ger.1", "Ligue 1":"soccer/fra.1", "UEFA Champions League":"soccer/uefa.champions",
-  "UEFA Europa League":"soccer/uefa.europa", "MLS":"soccer/usa.1", "Liga MX":"soccer/mex.1",
-  "Brazil Serie A":"soccer/bra.1", "Argentina Primera":"soccer/arg.1",
-  "NBA":"basketball/nba", "WNBA":"basketball/wnba", "NHL":"hockey/nhl", "MLB":"baseball/mlb", "NFL":"football/nfl"
-};
+const paths: Record<string, string> = Object.fromEntries(LEAGUES.map((item) => [item.league, item.path]));
 
 function normalizeScheduleEvent(event: any, teamId: string) {
   const competition = event.competitions?.[0];
@@ -34,8 +29,9 @@ function normalizeScheduleEvent(event: any, teamId: string) {
 export async function GET(req: NextRequest) {
   const league = req.nextUrl.searchParams.get("league") ?? "Premier League";
   const id = req.nextUrl.searchParams.get("id");
-  const path = paths[league];
-  if (!path || !id) return NextResponse.json({ error: "Match details unavailable." }, { status: 400 });
+  // ESPN finds a match by its id, so an unknown league name still works for football
+  const path = paths[league] ?? "soccer/eng.1";
+  if (!id) return NextResponse.json({ error: "Match details unavailable." }, { status: 400 });
 
   try {
     const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/summary?event=${encodeURIComponent(id)}`, {
@@ -46,12 +42,12 @@ export async function GET(req: NextRequest) {
     const competitors = d.header?.competitions?.[0]?.competitors ?? [];
     const schedules = await Promise.all(competitors.map(async (competitor: any) => {
       const teamId = String(competitor.team?.id ?? "");
-      if (!teamId) return { teamId, events: [] };
+      if (!teamId) return { teamId, recent: [], upcoming: [] };
       try {
         const r = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}/teams/${encodeURIComponent(teamId)}/schedule`, {
           headers: { Accept: "application/json" }, next: { revalidate: 300 }
         });
-        if (!r.ok) return { teamId, events: [] };
+        if (!r.ok) return { teamId, recent: [], upcoming: [] };
         const payload = await r.json();
         const events = (payload.events ?? payload.schedule ?? []).map((event: any) => normalizeScheduleEvent(event, teamId)).filter(Boolean);
         const now = Date.now();
