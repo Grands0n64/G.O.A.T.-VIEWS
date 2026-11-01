@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type RecordValue = Record<string, any>;
 type Tab = "Overview" | "Statistics" | "Lineups" | "Commentary" | "Team form";
+type View = "Performance" | "Nationality" | "Age" | "Height";
 
 const REFRESH_MS = 20000;
+const VIEWS: View[] = ["Performance", "Nationality", "Age", "Height"];
 
 /* ---------- helpers ---------- */
 function asArray(value: any): any[] {
@@ -42,6 +44,10 @@ function formatDate(value: any) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "Date unavailable" : date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
 }
+function withHash(value: any) {
+  const s = safeText(value, "").replace("#", "");
+  return /^[0-9a-f]{6}$/i.test(s) ? "#" + s : "";
+}
 function eventLabel(event: any) {
   return safeText(event.type?.text ?? event.type?.name ?? event.type ?? event.shortText ?? event.text ?? event.description, "Match event");
 }
@@ -59,9 +65,10 @@ function eventKind(event: any): "goal" | "yellow" | "red" | "sub" | "other" {
   if (/yellow/.test(t)) return "yellow";
   if (/red card|straight red|second yellow/.test(t)) return "red";
   if (/substitution/.test(t)) return "sub";
-  if (/goal|scored|penalty - scored/.test(t) && !/no goal|disallowed|saved|missed/.test(t)) return "goal";
+  if (/goal|scored|penalty - scored/.test(t) && !/no goal|disallowed|saved|missed|goal ?kick|goalkeeper/.test(t)) return "goal";
   return "other";
 }
+const isGoalEvent = (e: any) => eventKind(e) === "goal" || e.scoringPlay === true;
 const ICON: Record<string, string> = { goal: "⚽", yellow: "🟨", red: "🟥", sub: "🔁", other: "•" };
 
 /* ---------- live rating (calculated from live player stats) ---------- */
@@ -98,10 +105,11 @@ function playerRating(player: any, started: boolean, s: Record<string, number>):
   else if (isDef) r -= pick("goalsConceded") * 0.1;
   return Math.max(3, Math.min(10, Math.round(r * 10) / 10));
 }
-const ratingClass = (r: number) => (r >= 7.5 ? "great" : r >= 6.5 ? "good" : r >= 5.5 ? "ok" : "poor");
+const ratingClass = (r: number) => (r >= 7 ? "great" : r >= 6.5 ? "good" : r >= 6 ? "ok" : "poor");
+const ratingColor = (r: number) => (r >= 7 ? "#2fb344" : r >= 6.5 ? "#c9a227" : r >= 6 ? "#e8872a" : "#d63a2f");
 
 /* ---------- build lineups from rosters ---------- */
-type Side = { homeAway: string; teamId: string; team: string; formation: string; players: any[] };
+type Side = { homeAway: string; teamId: string; team: string; formation: string; players: any[]; logo?: string; color?: string };
 function buildSides(rosters: any, matchStarted: boolean): Side[] {
   return asArray(rosters).map((group: any, index: number) => ({
     homeAway: group.homeAway ?? (index === 0 ? "home" : "away"),
@@ -111,18 +119,26 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
     players: asArray(group.roster).map((p: any, i: number) => {
       const stats = statMap(p);
       const starter = p.starter === true;
+      const a = p.athlete ?? {};
+      const heightRaw = Number(a.height);
       return {
-        key: String(p.athlete?.id ?? index + "-" + i),
-        name: safeText(p.athlete?.shortName ?? p.athlete?.displayName ?? p.athlete?.fullName, "Player"),
-        fullName: safeText(p.athlete?.displayName ?? p.athlete?.fullName ?? p.athlete?.shortName, "Player"),
-        espnPhoto: p.athlete?.headshot?.href ?? "",
+        key: String(a.id ?? index + "-" + i),
+        name: safeText(a.shortName ?? a.displayName ?? a.fullName, "Player"),
+        fullName: safeText(a.displayName ?? a.fullName ?? a.shortName, "Player"),
+        espnPhoto: a.headshot?.href ?? "",
         photoList: [] as string[],
-        jersey: safeText(p.jersey ?? p.athlete?.jersey, ""),
+        jersey: safeText(p.jersey ?? a.jersey, ""),
         pos: safeText(p.position?.abbreviation ?? p.position?.displayName, ""),
+        captain: p.captain === true,
+        age: a.age ? String(a.age) : "",
+        nationality: safeText(a.citizenshipCountry?.abbreviation ?? a.citizenship ?? a.flag?.alt, ""),
+        flag: a.flag?.href ?? "",
+        height: a.displayHeight ? String(a.displayHeight) : Number.isFinite(heightRaw) && heightRaw > 0 ? Math.round(heightRaw < 100 ? heightRaw * 2.54 : heightRaw) + " cm" : "",
         place: num(p.formationPlace),
         starter,
         stats,
         goals: stats.totalGoals ?? stats.goals ?? 0,
+        assists: stats.goalAssists ?? stats.assists ?? 0,
         yellow: stats.yellowCards ?? 0,
         red: stats.redCards ?? 0,
         subbedOut: didSub(p.subbedOut),
@@ -173,7 +189,7 @@ function Avatar({ srcs, name, jersey, size }: { srcs: string[]; name: string; je
     alt={name}
     loading="lazy"
     onError={() => setIndex((i) => i + 1)}
-    style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", background: "#2a3944", border: "2px solid #fff", display: "block" }}
+    style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", background: "#e9edf0", border: "2px solid #fff", display: "block" }}
   />;
 }
 
@@ -219,34 +235,131 @@ function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]
   ))}</div>;
 }
 
-function Chip({ p }: { p: any }) {
-  return <div className="mc-chip" title={p.fullName} style={{ minWidth: 64 }}>
-    <div style={{ position: "relative", width: 46, height: 46, marginBottom: 2 }}>
-      <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={46} />
-      {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -6, right: -16, minWidth: 30, padding: "1px 4px", fontSize: 11 }}>{p.rating.toFixed(1)}</em>}
-      {p.jersey && <span style={{ position: "absolute", bottom: -3, left: -6, background: "#0b1218", color: "#fff", border: "1px solid #3a4a56", borderRadius: 8, fontSize: 9, padding: "1px 5px", fontWeight: 700 }}>{p.jersey}</span>}
+/* ---------- SofaScore-style lineup ---------- */
+const PITCH_LINE = "#3b444b";
+const iconBadge: React.CSSProperties = { position: "absolute", minWidth: 20, height: 20, padding: "0 3px", borderRadius: 10, background: "#fff", color: "#111", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, boxShadow: "0 1px 3px rgba(0,0,0,.5)" };
+
+function ValuePill({ p, view }: { p: any; view: View }) {
+  const base: React.CSSProperties = { position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 800, color: "#fff", padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 };
+  if (view === "Performance") {
+    if (p.rating === null) return null;
+    return <span style={{ ...base, background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}</span>;
+  }
+  const neutral = { ...base, background: "#2a3540" };
+  if (view === "Nationality") {
+    return <span style={neutral}>{p.flag ? <img src={p.flag} alt={p.nationality} width={18} height={12} style={{ display: "block" }} /> : (p.nationality || "–")}</span>;
+  }
+  if (view === "Age") return <span style={neutral}>{p.age || "–"}</span>;
+  return <span style={neutral}>{p.height || "–"}</span>;
+}
+
+function PitchPlayer({ p, view }: { p: any; view: View }) {
+  return <div style={{ display: "grid", justifyItems: "center", textAlign: "center", color: "#e8edf1" }} title={p.fullName}>
+    <div style={{ position: "relative", width: 50, height: 50 }}>
+      <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={50} />
+      {p.red > 0 ? <i style={{ position: "absolute", top: -4, left: -6, width: 11, height: 15, borderRadius: 2, background: "#e03131", border: "1px solid #fff" }} />
+        : p.yellow > 0 ? <i style={{ position: "absolute", top: -4, left: -6, width: 11, height: 15, borderRadius: 2, background: "#f5c518", border: "1px solid #fff" }} /> : null}
+      {p.goals > 0 && <span style={{ ...iconBadge, top: -6, right: -8 }}>⚽{p.goals > 1 ? p.goals : ""}</span>}
+      {p.assists > 0 && <span style={{ ...iconBadge, top: 16, right: -12 }}>👟{p.assists > 1 ? p.assists : ""}</span>}
+      {(p.subbedOut || p.subbedIn) && <span style={{ ...iconBadge, top: 18, left: -10, color: p.subbedOut ? "#d63a2f" : "#2fb344" }}>{p.subbedOut ? "⇄" : "⇄"}</span>}
+      <ValuePill p={p} view={view} />
     </div>
-    <b>{p.name}</b>
-    <span className="mc-marks">{"⚽".repeat(Math.min(p.goals, 4))}{p.yellow > 0 && !p.red ? "🟨" : ""}{p.red > 0 ? "🟥" : ""}{p.subbedOut ? "🔻" : ""}</span>
+    <div style={{ marginTop: 13, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, padding: "0 2px" }}>
+      <span style={{ opacity: 0.55, marginRight: 3 }}>{p.jersey}</span>{p.captain ? "(c) " : ""}{p.name}
+    </div>
   </div>;
 }
 
-function Lineups({ sides }: { sides: Side[] }) {
+function Shirt({ color }: { color: string }) {
+  return <svg viewBox="0 0 60 52" width={28} height={24} aria-hidden="true">
+    <path d="M18 2 L4 10 L9 24 L16 21 L16 50 L44 50 L44 21 L51 24 L56 10 L42 2 Q30 13 18 2 Z" fill={color} stroke="rgba(255,255,255,.5)" strokeWidth="1.5" />
+  </svg>;
+}
+
+function TeamHeader({ side, avg }: { side: Side; avg: number | null }) {
+  return <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", color: "#f2f6f8" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      {side.logo
+        ? <img src={side.logo} alt="" width={34} height={34} style={{ objectFit: "contain" }} />
+        : <span className="mc-crest" style={{ width: 34, height: 34, fontSize: 12, borderRadius: 10 }}>{side.team.slice(0, 3)}</span>}
+      <b style={{ fontSize: 16 }}>{side.team}</b>
+      {avg !== null && <span style={{ background: ratingColor(avg), color: "#fff", fontWeight: 800, fontSize: 12, padding: "2px 7px", borderRadius: 4 }}>{avg.toFixed(2)}</span>}
+    </div>
+    <div style={{ display: "grid", justifyItems: "end", gap: 4 }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: "#cfd8de" }}>{side.formation}</span>
+      <Shirt color={side.color || "#3a4a56"} />
+    </div>
+  </div>;
+}
+
+function Half({ rows, view, height, position }: { rows: any[][]; view: View; height: number; position: "top" | "bottom" }) {
+  return <div style={{ height, display: "flex", flexDirection: "column", justifyContent: "space-around", padding: position === "top" ? "10px 0 6px" : "6px 0 10px", position: "relative", zIndex: 1 }}>
+    {rows.map((row, r) => (
+      <div key={r} style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", padding: "0 4px" }}>
+        {row.map((p) => <div key={p.key} style={row.length > 5 ? { flex: "0 0 25%", marginBottom: 14 } : { flex: 1, minWidth: 0 }}><PitchPlayer p={p} view={view} /></div>)}
+      </div>
+    ))}
+  </div>;
+}
+
+function Lineups({ sides, view, setView }: { sides: Side[]; view: View; setView: (v: View) => void }) {
   const visible = sides.filter((s) => s.players.length);
   if (!visible.length) return <p className="mc-empty">Lineups have not been published for this match yet. They usually appear about an hour before kick-off.</p>;
+  const home = visible.find((s) => s.homeAway === "home") ?? visible[0];
+  const away = visible.find((s) => s !== home);
+  const rowsOf = (side: Side) => {
+    const starters = side.players.filter((p) => p.starter);
+    return starters.length ? formationRows(starters, side.formation) : [side.players];
+  };
+  const homeRows = rowsOf(home);
+  const awayRows = away ? [...rowsOf(away)].reverse() : [];
+  const rowHeight = 118;
+  const halfHeight = Math.max(homeRows.length, awayRows.length, 4) * rowHeight;
+  const avgOf = (s: Side) => {
+    const r = s.players.filter((p) => p.rating !== null).map((p) => p.rating as number);
+    return r.length ? r.reduce((a, b) => a + b, 0) / r.length : null;
+  };
+  const hasValue = (p: any) => (view === "Nationality" ? p.flag || p.nationality : view === "Age" ? p.age : view === "Height" ? p.height : true);
+  const missing = view !== "Performance" && !visible.some((s) => s.players.some(hasValue));
+  const line = "2px solid " + PITCH_LINE;
+
   return <>
-    <div className="mc-lineups">{visible.map((side, index) => {
-      const starters = side.players.filter((p) => p.starter);
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 12 }}>
+      {VIEWS.map((v) => (
+        <button key={v} onClick={() => setView(v)} style={{ border: 0, cursor: "pointer", whiteSpace: "nowrap", borderRadius: 20, padding: "9px 16px", fontWeight: 700, fontSize: 13, background: view === v ? "#e9edf0" : "#0b1015", color: view === v ? "#111" : "#e8edf1" }}>{v}</button>
+      ))}
+    </div>
+    {missing && <p className="mc-muted" style={{ marginBottom: 10 }}>{view} is not published for this match by the data provider.</p>}
+
+    <div style={{ background: "#0f151a", borderRadius: 10, overflow: "hidden", border: "1px solid #26343d" }}>
+      <TeamHeader side={home} avg={avgOf(home)} />
+      <div style={{ position: "relative", background: "#141b21", borderTop: line, borderBottom: away ? "none" : line }}>
+        {/* pitch markings */}
+        <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "46%", height: 150, borderLeft: line, borderRight: line, borderBottom: line }} />
+        <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "24%", height: 62, borderLeft: line, borderRight: line, borderBottom: line }} />
+        {away && <>
+          <div style={{ position: "absolute", top: "50%", left: 0, right: 0, borderTop: line }} />
+          <div style={{ position: "absolute", top: "50%", left: "50%", width: 140, height: 140, transform: "translate(-50%,-50%)", border: line, borderRadius: "50%" }} />
+          <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "46%", height: 150, borderLeft: line, borderRight: line, borderTop: line }} />
+          <div style={{ position: "absolute", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "24%", height: 62, borderLeft: line, borderRight: line, borderTop: line }} />
+        </>}
+        <Half rows={homeRows} view={view} height={halfHeight} position="top" />
+        {away && <Half rows={awayRows} view={view} height={halfHeight} position="bottom" />}
+      </div>
+      {away && <TeamHeader side={away} avg={avgOf(away)} />}
+    </div>
+
+    {visible.map((side, i) => {
       const subs = side.players.filter((p) => !p.starter);
-      const rows = starters.length ? formationRows(starters, side.formation).reverse() : [];
-      return <section key={side.team + index}>
-        <h4>{side.team}{side.formation && <small> · {side.formation}</small>}</h4>
-        {rows.length ? <div className="mc-pitch">{rows.map((row, r) => <div className="mc-pitch-row" key={r}>{row.map((p) => <Chip p={p} key={p.key} />)}</div>)}</div>
-          : <div className="mc-subs">{side.players.map((p) => <Chip p={p} key={p.key} />)}</div>}
-        {starters.length > 0 && subs.length > 0 && <><b className="mc-form-heading">Substitutes</b><div className="mc-subs">{subs.map((p) => <Chip p={p} key={p.key} />)}</div></>}
+      if (!subs.length || !side.players.some((p) => p.starter)) return null;
+      return <section key={side.team + i} style={{ marginTop: 14, background: "#0f151a", border: "1px solid #26343d", borderRadius: 10, padding: "12px 6px 18px" }}>
+        <b className="mc-form-heading" style={{ marginLeft: 10 }}>{side.team} · Substitutes</b>
+        <div style={{ display: "flex", flexWrap: "wrap", rowGap: 18, marginTop: 10 }}>
+          {subs.map((p) => <div key={p.key} style={{ flex: "0 0 25%", minWidth: 0 }}><PitchPlayer p={p} view={view} /></div>)}
+        </div>
       </section>;
-    })}</div>
-    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Players without a published photo show their shirt number.</p>
+    })}
+    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Players without a published photo show their shirt number. Ratings are calculated live from match stats.</p>
   </>;
 }
 
@@ -259,9 +372,9 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
       <div className="mc-top-card" key={p.team + p.key} style={{ justifyItems: "center", textAlign: "center" }}>
         <div style={{ position: "relative", width: 52, height: 52 }}>
           <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={52} />
-          <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", bottom: -6, right: -14, fontSize: 11 }}>{p.rating.toFixed(1)}</em>
+          <span style={{ position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 800, color: "#fff", padding: "1px 6px", borderRadius: 3, background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}</span>
         </div>
-        <b style={{ marginTop: 6 }}>{p.name}</b><small>{p.team}</small>
+        <b style={{ marginTop: 12 }}>{p.name}</b><small>{p.team}</small>
       </div>
     ))}</div>
     {sides.filter((s) => s.players.some((p) => p.rating !== null)).map((side, i) => (
@@ -273,7 +386,7 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
             <tr key={p.key}>
               <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={26} />{p.name}</span></td>
               <td><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em></td>
-              <td>{p.stats.totalGoals ?? 0}</td><td>{p.stats.goalAssists ?? 0}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td>
+              <td>{p.goals}</td><td>{p.assists}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td>
             </tr>
           ))}</tbody>
         </table></div>
@@ -314,6 +427,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
   const [tab, setTab] = useState<Tab>("Overview");
+  const [view, setView] = useState<View>("Performance");
   const [updated, setUpdated] = useState<Date | null>(null);
   const [photos, setPhotos] = useState<Record<string, string>>({});
 
@@ -363,6 +477,55 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const baseSides = useMemo(() => buildSides(data?.rosters, matchStarted), [data, matchStarted]);
   const rosterKey = baseSides.map((s) => s.players.map((p) => p.key).join(",")).join("|");
 
+  const events = useMemo(() => {
+    const base = asArray(data?.keyEvents).length ? asArray(data?.keyEvents) : asArray(data?.plays);
+    const seen = new Set<string>();
+    return base.filter((event: any) => {
+      const key = String(event.id ?? event.text ?? "");
+      if (!key || seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+  }, [data]);
+
+  // goals and assists per player, read from the match events
+  const tally = useMemo(() => {
+    const goals: Record<string, number> = {};
+    const assists: Record<string, number> = {};
+    for (const e of events) {
+      if (!isGoalEvent(e)) continue;
+      const own = /own goal/i.test(eventLabel(e) + " " + safeText(e.text, ""));
+      const parts = asArray(e.participants);
+      const scorer = parts[0]?.athlete?.id;
+      const assister = parts[1]?.athlete?.id;
+      if (own) continue;
+      if (scorer) goals[String(scorer)] = (goals[String(scorer)] ?? 0) + 1;
+      if (assister) assists[String(assister)] = (assists[String(assister)] ?? 0) + 1;
+    }
+    return { goals, assists };
+  }, [events]);
+
+  // scorers shown under each team in the header
+  const scorers = useMemo(() => {
+    const sideOf: Record<string, string> = {};
+    baseSides.forEach((s) => s.players.forEach((p) => { sideOf[p.key] = s.homeAway; }));
+    const list: Record<"home" | "away", any[]> = { home: [], away: [] };
+    for (const e of events) {
+      if (!isGoalEvent(e)) continue;
+      const text = eventLabel(e) + " " + safeText(e.text, "");
+      const own = /own goal/i.test(text);
+      const pen = /penalty/i.test(text) && !/missed|saved/i.test(text);
+      const athlete = asArray(e.participants)[0]?.athlete;
+      let side: string | undefined = athlete?.id ? sideOf[String(athlete.id)] : undefined;
+      if (side) { if (own) side = side === "home" ? "away" : "home"; }
+      else if (e.team?.id !== undefined) side = String(e.team.id) === homeId ? "home" : "away";
+      if (side !== "home" && side !== "away") continue;
+      list[side].push({ name: safeText(athlete?.displayName ?? athlete?.shortName ?? athlete?.fullName, "Goal"), minute: eventMinute(e), own, pen, order: minuteValue(e) });
+    }
+    list.home.sort((a, b) => b.order - a.order);
+    list.away.sort((a, b) => b.order - a.order);
+    return list;
+  }, [events, baseSides, homeId]);
+
   // look up photos for every player ESPN has none for: starters of both teams first, then subs
   useEffect(() => {
     let queue = baseSides
@@ -391,20 +554,21 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [rosterKey]);
 
-  const sides = useMemo(() => baseSides.map((s) => ({
-    ...s,
-    players: s.players.map((p) => ({ ...p, photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[] }))
-  })), [baseSides, photos]);
+  const sides = useMemo(() => baseSides.map((s) => {
+    const comp = competitors.find((c: any) => String(c.team?.id) === s.teamId);
+    return {
+      ...s,
+      logo: comp?.team?.logo ?? comp?.team?.logos?.[0]?.href ?? "",
+      color: withHash(comp?.team?.color) || "#3a4a56",
+      players: s.players.map((p) => {
+        const goals = Math.max(p.goals, tally.goals[p.key] ?? 0);
+        const assists = Math.max(p.assists, tally.assists[p.key] ?? 0);
+        const rating = p.rating === null ? null : Math.max(3, Math.min(10, Math.round((p.rating + (goals - p.goals) * 1.2 + (assists - p.assists) * 0.8) * 10) / 10));
+        return { ...p, goals, assists, rating, photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[] };
+      })
+    };
+  }), [baseSides, photos, tally, data]);
 
-  const events = useMemo(() => {
-    const base = asArray(data?.keyEvents).length ? asArray(data?.keyEvents) : asArray(data?.plays);
-    const seen = new Set<string>();
-    return base.filter((event: any) => {
-      const key = String(event.id ?? event.text ?? "");
-      if (!key || seen.has(key)) return false;
-      seen.add(key); return true;
-    });
-  }, [data]);
   const commentary = asArray(data?.commentary);
 
   const tabs: Tab[] = ["Overview", "Statistics", "Lineups", "Commentary", "Team form"];
@@ -414,6 +578,8 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
     ? numericHome === numericAway ? "The match finished level." : `${numericHome > numericAway ? homeName : awayName} won the match.`
     : isLive ? "This match is live. The page refreshes automatically." : "This match has not finished yet.";
   const teamSchedules = asArray(data?.teamSchedules);
+  const hasScorers = scorers.home.length > 0 || scorers.away.length > 0;
+  const scorerLine = (s: any) => `${s.name} ${s.minute}${s.pen ? " (P)" : ""}${s.own ? " (OG)" : ""}`;
 
   return <div className="mc-backdrop" onClick={onClose}><main className="mc-modal mc-fullpage" role="main" aria-label="Match details" onClick={(event) => event.stopPropagation()}>
     <div className="mc-topbar"><span>G.O.A.T. <b>VIEWS</b> <i>/</i> {league.toUpperCase()} / MATCH DETAILS</span><button onClick={onClose} aria-label="Back to scores">← Back</button></div>
@@ -423,7 +589,13 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
           <div className="mc-side"><span className="mc-crest">{homeName.slice(0, 3)}</span><b>{homeName}</b></div>
           <div className="mc-score"><strong>{homeScore}</strong><span>:</span><strong>{awayScore}</strong><small className={isLive ? "mc-live" : ""}>{isLive && <i className="mc-dot" />}{status}</small></div>
           <div className="mc-side mc-away"><span className="mc-crest">{awayName.slice(0, 3)}</span><b>{awayName}</b></div>
-        </div><div className="mc-venue">{[venue, competition?.venue?.address?.city].filter(Boolean).join(" · ")}{updated && isLive ? ` · Updated ${updated.toLocaleTimeString()}` : ""}</div></header>
+        </div>
+        {hasScorers && <div style={{ display: "grid", gridTemplateColumns: "1fr 28px 1fr", gap: 8, maxWidth: 560, margin: "6px auto 14px", fontSize: 12.5, lineHeight: 1.7, color: "#c5d0d8" }}>
+          <div style={{ textAlign: "right" }}>{scorers.home.map((s, i) => <div key={i}>{scorerLine(s)}</div>)}</div>
+          <div style={{ textAlign: "center", fontSize: 16, paddingTop: 2 }}>⚽</div>
+          <div style={{ textAlign: "left" }}>{scorers.away.map((s, i) => <div key={i}>{scorerLine(s)}</div>)}</div>
+        </div>}
+        <div className="mc-venue">{[venue, competition?.venue?.address?.city].filter(Boolean).join(" · ")}{updated && isLive ? ` · Updated ${updated.toLocaleTimeString()}` : ""}</div></header>
         <nav className="mc-tabs" aria-label="Match sections">{tabs.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}</nav>
         <div className="mc-content">
           {busy && <p className="mc-loading">Loading match information…</p>}
@@ -437,7 +609,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
             <section className="mc-section"><h3>Team statistics</h3><StatBars rows={statRows} /></section>
             <section className="mc-section"><h3>Live player ratings</h3><PlayerRatings sides={sides} /></section>
           </>}
-          {tab === "Lineups" && <section className="mc-section"><h3>Lineups & substitutes</h3><Lineups sides={sides} /></section>}
+          {tab === "Lineups" && <section className="mc-section"><h3>Lineups & substitutes</h3><Lineups sides={sides} view={view} setView={setView} /></section>}
           {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><Commentary items={commentary} fallback={events} homeId={homeId} /></section>}
           {tab === "Team form" && <section className="mc-section"><h3>Form & fixtures</h3><TeamForm schedules={teamSchedules} teams={[homeTeam, awayTeam]} /></section>}
         </div>
