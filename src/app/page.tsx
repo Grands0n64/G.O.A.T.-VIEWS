@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Bell, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Search, Star, Trophy, Tv, RefreshCw } from "lucide-react";
 import MatchCentre from "./components/MatchCentre";
+import MatchCentreErrorBoundary from "./components/MatchCentreErrorBoundary";
 import CompetitionStandings from "./components/CompetitionStandings";
 
 type Match = {
@@ -38,5 +39,5 @@ export default function Home(){
  <p className="disclaimer">Live scores and fixtures are displayed when available. Some competitions may have no scheduled matches on the selected date.</p>
  <CompetitionStandings/>
  <div className="bottomgrid" id="competitions"><section className="panel"><div className="sectiontitle"><div><h2>Competitions</h2><p>Filter matches by competition</p></div></div>{competitions.slice(1).map(c=><button className="comp" key={c} onClick={()=>{setLeague(c);document.getElementById("scores")?.scrollIntoView({behavior:"smooth"});}}><span>🏆</span>{c}<ChevronRight size={16}/></button>)}</section><section className="panel" id="stories"><div className="sectiontitle"><div><h2>Match centre</h2><p>Live data and match updates</p></div></div><div className="story"><Tv/><div><b>Live scoreboards</b><p>Scores, match status and fixture times from connected feeds.</p></div></div><div className="story"><Trophy/><div><b>Competition coverage</b><p>Coverage depends on the leagues published by the data source.</p></div></div><div className="story"><Star/><div><b>Favourites</b><p>Star matches to keep them highlighted during this session.</p></div></div></section></div>
- </section></div>{selected&&<MatchCentre id={selected.id} league={selected.league} home={selected.home} away={selected.away} onClose={()=>setSelected(null)}/>}<footer>© 2026 G.O.A.T. VIEWS <span>Global sports. One view.</span></footer></main>
+ </section></div>{selected&&<MatchCentreErrorBoundary><MatchCentre id={selected.id} league={selected.league} home={selected.home} away={selected.away} onClose={()=>setSelected(null)}/></MatchCentreErrorBoundary>}<footer>© 2026 G.O.A.T. VIEWS <span>Global sports. One view.</span></footer></main>
 }
