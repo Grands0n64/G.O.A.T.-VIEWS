@@ -111,10 +111,12 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
     players: asArray(group.roster).map((p: any, i: number) => {
       const stats = statMap(p);
       const starter = p.starter === true;
+      const athleteId = p.athlete?.id;
       return {
-        key: String(p.athlete?.id ?? index + "-" + i),
+        key: String(athleteId ?? index + "-" + i),
         name: safeText(p.athlete?.shortName ?? p.athlete?.displayName ?? p.athlete?.fullName, "Player"),
         fullName: safeText(p.athlete?.displayName ?? p.athlete?.fullName ?? p.athlete?.shortName, "Player"),
+        photo: p.athlete?.headshot?.href ?? (athleteId ? `https://a.espncdn.com/i/headshots/soccer/players/full/${athleteId}.png` : ""),
         jersey: safeText(p.jersey ?? p.athlete?.jersey, ""),
         pos: safeText(p.position?.abbreviation ?? p.position?.displayName, ""),
         place: num(p.formationPlace),
@@ -157,6 +159,20 @@ function collectStats(teams: any[], homeId: string) {
 }
 
 /* ---------- small components ---------- */
+function Avatar({ src, name, jersey, size }: { src: string; name: string; jersey: string; size: number }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <span className="mc-jersey" style={{ width: size, height: size, fontSize: Math.round(size / 2.6) }}>{jersey || name.slice(0, 1)}</span>;
+  }
+  return <img
+    src={src}
+    alt={name}
+    loading="lazy"
+    onError={() => setFailed(true)}
+    style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", background: "#2a3944", border: "2px solid #fff", display: "block" }}
+  />;
+}
+
 function StatBars({ rows, limit }: { rows: any[]; limit?: number }) {
   if (!rows.length) return <p className="mc-empty">Team statistics are not published for this match yet.</p>;
   return <div className="mc-bars">{rows.slice(0, limit ?? rows.length).map((row, i) => {
@@ -200,11 +216,14 @@ function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]
 }
 
 function Chip({ p }: { p: any }) {
-  return <div className="mc-chip" title={p.fullName}>
-    <span className="mc-jersey">{p.jersey || "•"}</span>
+  return <div className="mc-chip" title={p.fullName} style={{ minWidth: 64 }}>
+    <div style={{ position: "relative", width: 46, height: 46, marginBottom: 2 }}>
+      <Avatar src={p.photo} name={p.name} jersey={p.jersey} size={46} />
+      {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -6, right: -16, minWidth: 30, padding: "1px 4px", fontSize: 11 }}>{p.rating.toFixed(1)}</em>}
+      {p.jersey && <span style={{ position: "absolute", bottom: -3, left: -6, background: "#0b1218", color: "#fff", border: "1px solid #3a4a56", borderRadius: 8, fontSize: 9, padding: "1px 5px", fontWeight: 700 }}>{p.jersey}</span>}
+    </div>
     <b>{p.name}</b>
     <span className="mc-marks">{"⚽".repeat(Math.min(p.goals, 4))}{p.yellow > 0 && !p.red ? "🟨" : ""}{p.red > 0 ? "🟥" : ""}{p.subbedOut ? "🔻" : ""}</span>
-    {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em>}
   </div>;
 }
 
@@ -229,15 +248,26 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
   if (!rated.length) return <p className="mc-empty">Ratings appear once the match has started and lineups are published.</p>;
   const top = [...rated].sort((a, b) => b.rating - a.rating).slice(0, 5);
   return <>
-    <div className="mc-top">{top.map((p) => <div className="mc-top-card" key={p.team + p.key}><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em><b>{p.name}</b><small>{p.team}</small></div>)}</div>
+    <div className="mc-top">{top.map((p) => (
+      <div className="mc-top-card" key={p.team + p.key} style={{ justifyItems: "center", textAlign: "center" }}>
+        <div style={{ position: "relative", width: 52, height: 52 }}>
+          <Avatar src={p.photo} name={p.name} jersey={p.jersey} size={52} />
+          <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", bottom: -6, right: -14, fontSize: 11 }}>{p.rating.toFixed(1)}</em>
+        </div>
+        <b style={{ marginTop: 6 }}>{p.name}</b><small>{p.team}</small>
+      </div>
+    ))}</div>
     {sides.filter((s) => s.players.some((p) => p.rating !== null)).map((side, i) => (
       <section className="mc-playerstats" key={side.team + i}>
         <h4>{side.team}</h4>
         <div className="mc-table-scroll"><table>
           <thead><tr><th>Player</th><th>Rating</th><th>G</th><th>A</th><th>Shots</th><th>On target</th><th>Saves</th></tr></thead>
           <tbody>{side.players.filter((p) => p.rating !== null).sort((a, b) => b.rating - a.rating).map((p) => (
-            <tr key={p.key}><td>{p.name}</td><td><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em></td>
-              <td>{p.stats.totalGoals ?? 0}</td><td>{p.stats.goalAssists ?? 0}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td></tr>
+            <tr key={p.key}>
+              <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar src={p.photo} name={p.name} jersey={p.jersey} size={26} />{p.name}</span></td>
+              <td><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em></td>
+              <td>{p.stats.totalGoals ?? 0}</td><td>{p.stats.goalAssists ?? 0}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td>
+            </tr>
           ))}</tbody>
         </table></div>
       </section>
