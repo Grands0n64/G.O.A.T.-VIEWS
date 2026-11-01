@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type Props = { id: string; league: string; home: string; away: string; onClose: () => void };
+type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type AnyRecord = Record<string, any>;
 type Tab = "Overview" | "Statistics" | "Lineups" | "Commentary";
 
@@ -52,7 +52,7 @@ function PlayerStats({ groups }: { groups: any[] }) {
   return <>{blocks.map((b: any, i: number) => <section className="mc-playerstats" key={b.team + b.title + i}><h4>{b.team} · {b.title}</h4><div className="mc-table-scroll"><table><thead><tr><th>Player</th>{b.keys.map((k: any, j: number) => <th key={j}>{nice(k)}</th>)}</tr></thead><tbody>{b.athletes.map((a: any, j: number) => <tr key={a.athlete?.id ?? j}><td>{text(a.athlete)}</td>{(Array.isArray(a.stats) ? a.stats : []).map((s: any, k: number) => <td key={k}>{text(s)}</td>)}</tr>)}</tbody></table></div></section>)}</>;
 }
 
-export default function MatchCentre({ id, league, home, away, onClose }: Props) {
+export default function MatchCentre({ id, league, home, away, homeScore: initialHomeScore, awayScore: initialAwayScore, status: initialStatus, venue: initialVenue, onClose }: Props) {
   const [data, setData] = useState<AnyRecord | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(true);
