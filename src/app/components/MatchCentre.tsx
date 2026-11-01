@@ -5,8 +5,14 @@ import { useEffect, useMemo, useState } from "react";
 type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type RecordValue = Record<string, any>;
 type Tab = "Overview" | "Statistics" | "Lineups" | "Commentary" | "Team form";
+type KitColors = { shirt: string; trim: string; text: string };
 
 const REFRESH_MS = 20000;
+
+/* Force the exact kit for a team (lowercase team name). Example:
+   "chelsea": { shirt: "#034694", trim: "#ffffff" },
+   "manchester united": { shirt: "#da291c", trim: "#ffffff" }, */
+const KIT_OVERRIDES: Record<string, { shirt: string; trim: string }> = {};
 
 /* ---------- helpers ---------- */
 function asArray(value: any): any[] {
@@ -64,6 +70,45 @@ function eventKind(event: any): "goal" | "yellow" | "red" | "sub" | "other" {
 }
 const ICON: Record<string, string> = { goal: "⚽", yellow: "🟨", red: "🟥", sub: "🔁", other: "•" };
 
+/* ---------- kit colours ---------- */
+function hexToRgb(hex: string): [number, number, number] | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function colourDistance(a: string, b: string) {
+  const x = hexToRgb(a), y = hexToRgb(b);
+  if (!x || !y) return 999;
+  return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+}
+function readableOn(hex: string) {
+  const c = hexToRgb(hex);
+  if (!c) return "#ffffff";
+  return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2] > 150 ? "#111111" : "#ffffff";
+}
+function withHash(value: any) {
+  const s = safeText(value, "").replace("#", "");
+  return /^[0-9a-f]{6}$/i.test(s) ? "#" + s : "";
+}
+function buildKits(homeTeam: any, awayTeam: any) {
+  const pick = (t: any) => {
+    const override = KIT_OVERRIDES[teamName(t, "").toLowerCase()];
+    if (override) return { main: override.shirt, alt: override.trim };
+    return { main: withHash(t?.team?.color) || "#3a4a56", alt: withHash(t?.team?.alternateColor) || "#ffffff" };
+  };
+  const h = pick(homeTeam), a = pick(awayTeam);
+  let awayShirt = a.main, awayTrim = a.alt;
+  if (colourDistance(h.main, a.main) < 90) {
+    if (colourDistance(h.main, a.alt) >= 90) { awayShirt = a.alt; awayTrim = a.main; }
+    else { awayShirt = readableOn(h.main) === "#ffffff" ? "#f2f2f2" : "#222222"; awayTrim = a.main; }
+  }
+  const gkOptions = ["#f5c242", "#2ecc71", "#ff7a45", "#8e5cf6", "#e91e63", "#00bcd4"];
+  const gkShirt = gkOptions.find((c) => colourDistance(c, h.main) > 110 && colourDistance(c, awayShirt) > 110) ?? "#f5c242";
+  const mk = (shirt: string, trim: string): KitColors => ({ shirt, trim, text: readableOn(shirt) });
+  return { home: mk(h.main, h.alt), away: mk(awayShirt, awayTrim), gk: mk(gkShirt, "#111111") };
+}
+
 /* ---------- live rating (calculated from live player stats) ---------- */
 function statMap(player: any): Record<string, number> {
   const out: Record<string, number> = {};
@@ -117,6 +162,7 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
         fullName: safeText(p.athlete?.displayName ?? p.athlete?.fullName ?? p.athlete?.shortName, "Player"),
         espnPhoto: p.athlete?.headshot?.href ?? "",
         photoList: [] as string[],
+        kit: null as KitColors | null,
         jersey: safeText(p.jersey ?? p.athlete?.jersey, ""),
         pos: safeText(p.position?.abbreviation ?? p.position?.displayName, ""),
         place: num(p.formationPlace),
@@ -159,22 +205,48 @@ function collectStats(teams: any[], homeId: string) {
 }
 
 /* ---------- small components ---------- */
-function Avatar({ srcs, name, jersey, size }: { srcs: string[]; name: string; jersey: string; size: number }) {
+function initials(name: string) {
+  const parts = name.replace(/[^\p{L}\s'-]/gu, "").split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
+  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+function Avatar({ srcs, name, jersey, size, zoom = 1, fallbackText }: { srcs: string[]; name: string; jersey: string; size: number; zoom?: number; fallbackText?: string }) {
   const list = srcs.filter(Boolean);
   const signature = list.join("|");
   const [index, setIndex] = useState(0);
   useEffect(() => { setIndex(0); }, [signature]);
   if (index >= list.length) {
-    return <span className="mc-jersey" style={{ width: size, height: size, fontSize: Math.round(size / 2.6) }}>{jersey || name.slice(0, 1)}</span>;
+    return <span className="mc-jersey" style={{ width: size, height: size, fontSize: Math.round(size / 2.6) }}>{fallbackText ?? (jersey || name.slice(0, 1))}</span>;
   }
-  return <img
-    key={list[index]}
-    src={list[index]}
-    alt={name}
-    loading="lazy"
-    onError={() => setIndex((i) => i + 1)}
-    style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", background: "#2a3944", border: "2px solid #fff", display: "block" }}
-  />;
+  return <span style={{ display: "block", width: size, height: size, borderRadius: "50%", overflow: "hidden", border: "2px solid #fff", background: "#2a3944" }}>
+    <img
+      key={list[index]}
+      src={list[index]}
+      alt={name}
+      loading="lazy"
+      onError={() => setIndex((i) => i + 1)}
+      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", transform: `scale(${zoom})`, transformOrigin: "50% 18%", display: "block" }}
+    />
+  </span>;
+}
+
+// player face on top of a shirt in the team's colours
+function Kit({ p, scale = 1 }: { p: any; scale?: number }) {
+  const k: KitColors = p.kit ?? { shirt: "#3a4a56", trim: "#ffffff", text: "#ffffff" };
+  const w = 58 * scale, h = 68 * scale, head = 36 * scale;
+  return <div style={{ position: "relative", width: w, height: h }}>
+    <svg viewBox="0 0 60 52" width={w} height={(w * 52) / 60} style={{ position: "absolute", left: 0, bottom: 0 }} aria-hidden="true">
+      <path d="M18 2 L4 10 L9 24 L16 21 L16 50 L44 50 L44 21 L51 24 L56 10 L42 2 Q30 13 18 2 Z" fill={k.shirt} stroke="rgba(0,0,0,.35)" strokeWidth="1" />
+      <path d="M4 10 L9 24" stroke={k.trim} strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M56 10 L51 24" stroke={k.trim} strokeWidth="3.2" strokeLinecap="round" />
+      <path d="M18 2 Q30 13 42 2" fill="none" stroke={k.trim} strokeWidth="2.6" />
+      <text x="30" y="40" textAnchor="middle" fontSize="15" fontWeight="800" fill={k.text} fontFamily="Space Grotesk, sans-serif">{p.jersey}</text>
+    </svg>
+    <div style={{ position: "absolute", left: (w - head) / 2, top: 0 }}>
+      <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={head} zoom={1.3} fallbackText={initials(p.fullName)} />
+    </div>
+  </div>;
 }
 
 function StatBars({ rows, limit }: { rows: any[]; limit?: number }) {
@@ -220,11 +292,10 @@ function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]
 }
 
 function Chip({ p }: { p: any }) {
-  return <div className="mc-chip" title={p.fullName} style={{ minWidth: 64 }}>
-    <div style={{ position: "relative", width: 46, height: 46, marginBottom: 2 }}>
-      <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={46} />
-      {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -6, right: -16, minWidth: 30, padding: "1px 4px", fontSize: 11 }}>{p.rating.toFixed(1)}</em>}
-      {p.jersey && <span style={{ position: "absolute", bottom: -3, left: -6, background: "#0b1218", color: "#fff", border: "1px solid #3a4a56", borderRadius: 8, fontSize: 9, padding: "1px 5px", fontWeight: 700 }}>{p.jersey}</span>}
+  return <div className="mc-chip" title={p.fullName} style={{ minWidth: 72 }}>
+    <div style={{ position: "relative" }}>
+      <Kit p={p} />
+      {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -4, right: -14, minWidth: 30, padding: "1px 4px", fontSize: 11 }}>{p.rating.toFixed(1)}</em>}
     </div>
     <b>{p.name}</b>
     <span className="mc-marks">{"⚽".repeat(Math.min(p.goals, 4))}{p.yellow > 0 && !p.red ? "🟨" : ""}{p.red > 0 ? "🟥" : ""}{p.subbedOut ? "🔻" : ""}</span>
@@ -246,7 +317,7 @@ function Lineups({ sides }: { sides: Side[] }) {
         {starters.length > 0 && subs.length > 0 && <><b className="mc-form-heading">Substitutes</b><div className="mc-subs">{subs.map((p) => <Chip p={p} key={p.key} />)}</div></>}
       </section>;
     })}</div>
-    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Players without a published photo show their shirt number.</p>
+    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Shirts use each team's colours.</p>
   </>;
 }
 
@@ -257,9 +328,9 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
   return <>
     <div className="mc-top">{top.map((p) => (
       <div className="mc-top-card" key={p.team + p.key} style={{ justifyItems: "center", textAlign: "center" }}>
-        <div style={{ position: "relative", width: 52, height: 52 }}>
-          <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={52} />
-          <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", bottom: -6, right: -14, fontSize: 11 }}>{p.rating.toFixed(1)}</em>
+        <div style={{ position: "relative" }}>
+          <Kit p={p} />
+          <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -4, right: -14, fontSize: 11 }}>{p.rating.toFixed(1)}</em>
         </div>
         <b style={{ marginTop: 6 }}>{p.name}</b><small>{p.team}</small>
       </div>
@@ -271,7 +342,7 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
           <thead><tr><th>Player</th><th>Rating</th><th>G</th><th>A</th><th>Shots</th><th>On target</th><th>Saves</th></tr></thead>
           <tbody>{side.players.filter((p) => p.rating !== null).sort((a, b) => b.rating - a.rating).map((p) => (
             <tr key={p.key}>
-              <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={26} />{p.name}</span></td>
+              <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={28} zoom={1.3} fallbackText={initials(p.fullName)} />{p.name}</span></td>
               <td><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em></td>
               <td>{p.stats.totalGoals ?? 0}</td><td>{p.stats.goalAssists ?? 0}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td>
             </tr>
@@ -360,6 +431,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
 
   const teams = asArray(data?.boxscore?.teams);
   const statRows = useMemo(() => collectStats(teams, homeId), [data]);
+  const kits = useMemo(() => buildKits(homeTeam, awayTeam), [data]);
   const baseSides = useMemo(() => buildSides(data?.rosters, matchStarted), [data, matchStarted]);
   const rosterKey = baseSides.map((s) => s.players.map((p) => p.key).join(",")).join("|");
 
@@ -391,10 +463,17 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [rosterKey]);
 
-  const sides = useMemo(() => baseSides.map((s) => ({
-    ...s,
-    players: s.players.map((p) => ({ ...p, photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[] }))
-  })), [baseSides, photos]);
+  const sides = useMemo(() => baseSides.map((s) => {
+    const teamKit = s.teamId && s.teamId === homeId ? kits.home : s.homeAway === "home" && !homeId ? kits.home : kits.away;
+    return {
+      ...s,
+      players: s.players.map((p) => ({
+        ...p,
+        photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[],
+        kit: /^G/i.test(p.pos) ? kits.gk : teamKit
+      }))
+    };
+  }), [baseSides, photos, kits, homeId]);
 
   const events = useMemo(() => {
     const base = asArray(data?.keyEvents).length ? asArray(data?.keyEvents) : asArray(data?.plays);
