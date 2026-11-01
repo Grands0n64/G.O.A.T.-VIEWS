@@ -10,3 +10,46 @@
 .comp{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer}
 @media(max-width:650px){.stats{grid-template-columns:repeat(2,1fr)}.date input{width:105px}}
 .modalback{position:fixed;inset:0;background:#000b;z-index:50;display:grid;place-items:center;padding:18px}.matchmodal{background:#101821;border:1px solid #304039;border-radius:14px;padding:24px;width:min(850px,100%);max-height:88vh;overflow:auto;color:#f2f6f8}.modalclose{float:right;background:#26352b;border:0;color:white;border-radius:7px;padding:8px 12px}.matchmodal h2{font-size:23px}.matchmodal h2 span{color:#b5f34a}.detailsection{border-top:1px solid #26343d;padding:13px 0}.detailsection h3,.standings h3{font-size:14px;color:#b5f34a}.detailsection pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#080d13;border-radius:8px;padding:12px;font-size:10px;max-height:280px;overflow:auto}.detailsection p{color:#81909e;font-size:12px}.standings{margin-top:18px}.standings select{background:#101821;color:#fff;border:1px solid #304039;border-radius:7px;padding:8px;max-width:170px}.tablewrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:11px}th,td{text-align:left;padding:9px;border-bottom:1px solid #26343d;white-space:nowrap}th{color:#8b9aa5}td:first-child{color:#b5f34a}.game{cursor:pointer}.game:hover{border-color:#66864a}
+/* SofaScore-inspired match centre layout */
+.mc-backdrop{position:fixed;inset:0;z-index:100;background:rgba(2,7,11,.88);backdrop-filter:blur(7px);display:flex;justify-content:center;align-items:flex-start;padding:24px 14px;overflow-y:auto}
+.mc-modal{width:min(980px,100%);min-height:70vh;background:#0d151d;border:1px solid #293743;border-radius:16px;overflow:hidden;box-shadow:0 24px 90px #000a;color:#f2f6f8}
+.mc-topbar{height:52px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #26343d;font-size:10px;font-weight:800;letter-spacing:1.3px;color:#aab7c1}
+.mc-topbar b{color:#b5f34a}.mc-topbar i{font-style:normal;color:#596874;margin:0 8px}
+.mc-topbar button{width:32px;height:32px;border:1px solid #33424c;background:#18232c;color:white;border-radius:8px;font-size:17px;cursor:pointer}
+.mc-hero{padding:25px 24px 18px;background:radial-gradient(ellipse at 50% 0%,#243b31 0,#14221f 48%,#101821 100%);text-align:center}
+.mc-league{font-size:11px;font-weight:700;color:#a7b5bd;letter-spacing:.6px}
+.mc-scoreboard{display:grid;grid-template-columns:1fr 170px 1fr;align-items:center;gap:14px;margin:22px auto 14px;max-width:700px}
+.mc-side{display:flex;flex-direction:column;align-items:center;gap:10px;font-size:15px;font-weight:700}
+.mc-away{grid-column:3}
+.mc-crest{width:58px;height:58px;border-radius:17px;background:#293a40;border:1px solid #52664f;display:grid;place-items:center;color:#b5f34a;font:700 25px 'Space Grotesk';text-transform:uppercase}
+.mc-score{display:flex;justify-content:center;align-items:center;gap:13px;flex-wrap:wrap}
+.mc-score strong{font:700 38px 'Space Grotesk'}
+.mc-score>span{font-size:24px;color:#7e8c96}
+.mc-score small{flex-basis:100%;font-size:10px;color:#b5f34a;font-weight:800;letter-spacing:.7px}
+.mc-venue{font-size:10px;color:#82929d}
+.mc-tabs{display:flex;gap:4px;padding:0 20px;border-bottom:1px solid #293640;background:#111b24;overflow-x:auto}
+.mc-tabs button{padding:15px 16px;border:0;border-bottom:2px solid transparent;background:none;color:#9ba9b4;font:700 12px 'DM Sans';white-space:nowrap;cursor:pointer}
+.mc-tabs button.active{color:#b5f34a;border-bottom-color:#b5f34a}
+.mc-content{padding:18px 22px 28px;min-height:250px}
+.mc-section{margin-bottom:22px}
+.mc-section h3{font:700 15px 'Space Grotesk';margin:0 0 13px;color:#f2f6f8}
+.mc-empty{padding:22px 14px;text-align:center;color:#84939e;font-size:12px;background:#121d26;border:1px solid #26343d;border-radius:9px}
+.mc-stats{display:flex;flex-direction:column;border:1px solid #293640;border-radius:9px;overflow:hidden}
+.mc-stat{display:grid;grid-template-columns:1fr minmax(130px,1.2fr) 1fr;gap:12px;padding:11px 15px;border-bottom:1px solid #26343d;align-items:center;text-align:center;font-size:12px}
+.mc-stat:last-child{border-bottom:0}.mc-stat b{font:700 13px 'Space Grotesk'}.mc-stat span{color:#91a0aa;font-size:11px}
+.mc-timeline{max-width:680px;margin:auto;border-left:1px solid #40504d;padding:4px 0 4px 19px}
+.mc-event{position:relative;display:grid;grid-template-columns:48px 1fr;gap:12px;padding:0 0 17px;align-items:start}
+.mc-event i{position:absolute;left:-24px;top:4px;width:9px;height:9px;background:#b5f34a;border:2px solid #0d151d;border-radius:50%}
+.mc-event time{font-size:10px;color:#b5f34a;font-weight:800}.mc-event p{margin:0;font-size:12px;line-height:1.5;color:#d3dbe0}
+.mc-lineups{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.mc-lineups>section,.mc-playerstats{background:#121d26;border:1px solid #293640;border-radius:9px;padding:13px}
+.mc-lineups h4,.mc-playerstats h4{font-size:12px;margin:0 0 10px;color:#b5f34a}
+.mc-player{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #27343d;font-size:11px}
+.mc-player small{color:#84939e}
+.mc-commentary article{padding:12px 0;border-bottom:1px solid #293640}
+.mc-commentary time{font-size:10px;color:#b5f34a}.mc-commentary p{font-size:12px;line-height:1.5;margin:5px 0 0;color:#d2dbe0}
+.mc-playerstats{margin:12px 0}.mc-table-scroll{overflow-x:auto}
+.mc-table-scroll table{border-collapse:collapse;width:100%;font-size:11px}
+.mc-table-scroll th,.mc-table-scroll td{padding:9px 10px;border-bottom:1px solid #293640;text-align:left;white-space:nowrap}
+.mc-table-scroll th{color:#8999a4}.mc-table-scroll td:first-child{color:#f2f6f8}
+@media(max-width:600px){.mc-backdrop{padding:0;align-items:stretch}.mc-modal{border-radius:0;min-height:100vh}.mc-hero{padding:22px 12px 16px}.mc-scoreboard{grid-template-columns:1fr 105px 1fr;gap:5px}.mc-side{font-size:11px}.mc-crest{width:44px;height:44px;font-size:20px;border-radius:13px}.mc-score{gap:7px}.mc-score strong{font-size:29px}.mc-tabs{padding:0 8px}.mc-tabs button{padding:14px 12px;font-size:11px}.mc-content{padding:16px 12px}.mc-lineups{grid-template-columns:1fr}.mc-stat{grid-template-columns:45px 1fr 45px;padding:10px 8px}.mc-stat span{font-size:10px}}
