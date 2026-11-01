@@ -246,7 +246,7 @@ function Lineups({ sides }: { sides: Side[] }) {
         {starters.length > 0 && subs.length > 0 && <><b className="mc-form-heading">Substitutes</b><div className="mc-subs">{subs.map((p) => <Chip p={p} key={p.key} />)}</div></>}
       </section>;
     })}</div>
-    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN and TheSportsDB. Players without a published photo show their shirt number.</p>
+    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Players without a published photo show their shirt number.</p>
   </>;
 }
 
@@ -363,18 +363,20 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const baseSides = useMemo(() => buildSides(data?.rosters, matchStarted), [data, matchStarted]);
   const rosterKey = baseSides.map((s) => s.players.map((p) => p.key).join(",")).join("|");
 
-  // fetch photos for players ESPN has no photo for (starters first, retries while the free limit resets)
+  // look up photos for every player ESPN has none for: starters of both teams first, then subs
   useEffect(() => {
-    let queue = baseSides.flatMap((s) =>
-      [...s.players].filter((p) => !p.espnPhoto).sort((a, b) => Number(b.starter) - Number(a.starter)).map((p) => ({ name: p.fullName, team: s.team }))
-    );
+    let queue = baseSides
+      .flatMap((s) => s.players.map((p, index) => ({ p, team: s.team, index })))
+      .filter((x) => !x.p.espnPhoto)
+      .sort((a, b) => Number(!a.p.starter) - Number(!b.p.starter) || a.index - b.index)
+      .map((x) => ({ name: x.p.fullName, team: x.team }));
     if (!queue.length) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const run = async (attempt: number) => {
       if (!active || !queue.length) return;
       try {
-        const response = await fetch("/api/player-photos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: queue.slice(0, 25) }) });
+        const response = await fetch("/api/player-photos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: queue.slice(0, 30) }) });
         const payload = await response.json();
         if (!active) return;
         const resolved = payload?.photos ?? {};
@@ -383,7 +385,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
         if (Object.keys(found).length) setPhotos((prev) => ({ ...prev, ...found }));
         queue = queue.filter((q) => !(q.name in resolved));
       } catch { /* try again below */ }
-      if (queue.length && attempt < 8) timer = setTimeout(() => run(attempt + 1), 25000);
+      if (queue.length && attempt < 15) timer = setTimeout(() => run(attempt + 1), 6000);
     };
     run(0);
     return () => { active = false; if (timer) clearTimeout(timer); };
