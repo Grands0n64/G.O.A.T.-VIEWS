@@ -34,7 +34,7 @@ function normalize(event: any, source: (typeof SOURCES)[number]) {
   return {
     id: String(event.id),
     sport: source.sport,
-    league: event.league?.name ?? source.league,
+    league: source.league,
     country: event.season?.name ?? "",
     home: home.team?.displayName ?? home.team?.name ?? "Home",
     away: away.team?.displayName ?? away.team?.name ?? "Away",
