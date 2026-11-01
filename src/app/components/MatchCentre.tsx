@@ -77,8 +77,8 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const homeTeam = competitors.find((x: any) => x.homeAway === "home") ?? competitors[0];
   const awayTeam = competitors.find((x: any) => x.homeAway === "away") ?? competitors[1];
   const status = text(competition.status?.type?.shortDetail ?? competition.status?.type?.detail ?? data?.header?.season?.name, initialStatus || "Match details");
-  const homeName = text(homeNameTeam?.team?.name, home);
-  const awayName = text(awayNameTeam?.team?.name, away);
+  const homeName = text(homeTeam?.team?.displayName ?? homeTeam?.team?.name, home);
+  const awayName = text(awayTeam?.team?.displayName ?? awayTeam?.team?.name, away);
   const homeScore = text(homeTeam?.score, initialHomeScore === null ? "—" : String(initialHomeScore));
   const awayScore = text(awayTeam?.score, initialAwayScore === null ? "—" : String(initialAwayScore));
   const venue = text(competition.venue?.fullName ?? competition.venue?.address?.city, initialVenue || "");
