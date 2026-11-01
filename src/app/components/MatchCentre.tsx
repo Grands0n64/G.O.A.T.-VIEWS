@@ -36,20 +36,20 @@ function Timeline({ plays }: { plays: any }) {
   })}</div>;
 }
 function Lineups({ rosters }: { rosters: any }) {
-  const groups = Array.isArray(rosters) ? rosters : Array.isArray(rosters?.teams) ? rosters.teams : [];
+  const groups = (Array.isArray(rosters) ? rosters : Array.isArray(rosters?.teams) ? rosters.teams : []).filter((g: any) => g && typeof g === "object");
   const teams = groups.map((g: any) => ({ name: team(g, "Team"), players: Array.isArray(g.roster) ? g.roster : Array.isArray(g.athletes) ? g.athletes : [] })).filter((g: any) => g.players.length);
   if (!teams.length) return <p className="mc-empty">Lineups have not been published for this match.</p>;
   return <div className="mc-lineups">{teams.map((g: any, i: number) => <section key={g.name + i}><h4>{g.name}</h4>{g.players.map((p: any, j: number) => <div className="mc-player" key={p.athlete?.id ?? p.id ?? j}><span>{text(p.athlete ?? p)}</span><small>{text(p.position?.abbreviation ?? p.position?.displayName ?? p.position ?? p.jersey, "")}</small></div>)}</section>)}</div>;
 }
 function Commentary({ data }: { data: any }) {
-  const items = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  const items = (Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : []).filter((x: any) => x && typeof x === "object");
   if (!items.length) return <p className="mc-empty">Commentary is not available for this match.</p>;
   return <div className="mc-commentary">{items.map((x: any, i: number) => <article key={x.id ?? i}><time>{x.time ?? x.clock?.displayValue ?? ""}</time><p>{x.text ?? x.description ?? x.headline ?? ""}</p></article>)}</div>;
 }
 function PlayerStats({ groups }: { groups: any[] }) {
-  const blocks = (Array.isArray(groups) ? groups : []).flatMap((g: any) => (Array.isArray(g.statistics) ? g.statistics : []).filter((c: any) => Array.isArray(c.athletes) && c.athletes.length).map((c: any) => ({ team: team(g, "Team"), title: nice(c.name ?? c.displayName ?? "Players"), keys: c.labels ?? c.keys ?? [], athletes: c.athletes })));
+  const blocks = (Array.isArray(groups) ? groups : []).filter((g: any) => g && typeof g === "object").flatMap((g: any) => (Array.isArray(g.statistics) ? g.statistics : []).filter((c: any) => c && Array.isArray(c.athletes) && c.athletes.length).map((c: any) => ({ team: team(g, "Team"), title: nice(c.name ?? c.displayName ?? "Players"), keys: Array.isArray(c.labels) ? c.labels : Array.isArray(c.keys) ? c.keys : [], athletes: c.athletes })));
   if (!blocks.length) return <p className="mc-empty">Individual player statistics are not available for this match.</p>;
-  return <>{blocks.map((b: any, i: number) => <section className="mc-playerstats" key={b.team + b.title + i}><h4>{b.team} · {b.title}</h4><div className="mc-table-scroll"><table><thead><tr><th>Player</th>{b.keys.map((k: any, j: number) => <th key={j}>{nice(k)}</th>)}</tr></thead><tbody>{b.athletes.map((a: any, j: number) => <tr key={a.athlete?.id ?? j}><td>{text(a.athlete)}</td>{(a.stats ?? []).map((s: any, k: number) => <td key={k}>{text(s)}</td>)}</tr>)}</tbody></table></div></section>)}</>;
+  return <>{blocks.map((b: any, i: number) => <section className="mc-playerstats" key={b.team + b.title + i}><h4>{b.team} · {b.title}</h4><div className="mc-table-scroll"><table><thead><tr><th>Player</th>{b.keys.map((k: any, j: number) => <th key={j}>{nice(k)}</th>)}</tr></thead><tbody>{b.athletes.map((a: any, j: number) => <tr key={a.athlete?.id ?? j}><td>{text(a.athlete)}</td>{(Array.isArray(a.stats) ? a.stats : []).map((s: any, k: number) => <td key={k}>{text(s)}</td>)}</tr>)}</tbody></table></div></section>)}</>;
 }
 
 export default function MatchCentre({ id, league, home, away, onClose }: Props) {
@@ -68,12 +68,18 @@ export default function MatchCentre({ id, league, home, away, onClose }: Props) 
     return () => { active = false; };
   }, [id, league]);
   const competition = data?.header?.competitions?.[0] ?? {};
-  const competitors = competition.competitors ?? [];
+  const competitors = Array.isArray(competition.competitors) ? competition.competitors : [];
   const homeTeam = competitors.find((x: any) => x.homeAway === "home") ?? competitors[0];
   const awayTeam = competitors.find((x: any) => x.homeAway === "away") ?? competitors[1];
   const status = competition.status?.type?.shortDetail ?? competition.status?.type?.detail ?? data?.header?.season?.name ?? "Match details";
   const homeScore = homeTeam?.score ?? "—", awayScore = awayTeam?.score ?? "—";
   const venue = competition.venue?.fullName ?? competition.venue?.address?.city ?? "";
+  const numericHome = Number(homeScore), numericAway = Number(awayScore);
+  const hasFinalScore = Number.isFinite(numericHome) && Number.isFinite(numericAway) && (competition.status?.type?.completed === true || /final|ft|full time/i.test(status));
+  const resultAnalysis = hasFinalScore
+    ? numericHome === numericAway ? `${homeTeam?.team?.displayName ?? home} and ${awayTeam?.team?.displayName ?? away} finished level at ${homeScore}–${awayScore}.`
+      : `${numericHome > numericAway ? (homeTeam?.team?.displayName ?? home) : (awayTeam?.team?.displayName ?? away)} won ${Math.abs(numericHome - numericAway)}-goal${Math.abs(numericHome - numericAway) === 1 ? "" : "s"} clear, scoring ${Math.max(numericHome, numericAway)} and conceding ${Math.min(numericHome, numericAway)}.`
+    : `The current score is ${homeScore}–${awayScore}. Match analysis will expand as verified match events and statistics are supplied.`;
   const teams = data?.boxscore?.teams ?? [];
   const players = data?.boxscore?.players ?? [];
   const tabs: Tab[] = ["Overview", "Statistics", "Lineups", "Commentary"];
@@ -86,7 +92,7 @@ export default function MatchCentre({ id, league, home, away, onClose }: Props) 
     </div>{venue && <div className="mc-venue">⌖ {venue}</div>}</div>
     <nav className="mc-tabs" aria-label="Match sections">{tabs.map(t => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</nav>
     <div className="mc-content">{busy ? <p className="mc-empty">Loading match centre…</p> : error ? <p className="mc-empty">{error}</p> : <>
-      {tab === "Overview" && <><section className="mc-section"><h3>Match timeline</h3><Timeline plays={data?.plays}/></section><section className="mc-section"><h3>Match statistics</h3><TeamStats teams={teams}/></section></>}
+      {tab === "Overview" && <><section className="mc-section"><h3>Result analysis</h3><p className="mc-analysis">{resultAnalysis}</p></section><section className="mc-section"><h3>Match timeline</h3><Timeline plays={data?.plays}/></section><section className="mc-section"><h3>Match statistics</h3><TeamStats teams={teams}/></section></>}
       {tab === "Statistics" && <><section className="mc-section"><h3>Team statistics</h3><TeamStats teams={teams}/></section><section className="mc-section"><h3>Player statistics</h3><PlayerStats groups={players}/></section></>}
       {tab === "Lineups" && <section className="mc-section"><h3>Starting lineups</h3><Lineups rosters={data?.rosters}/></section>}
       {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><Commentary data={data?.commentary}/></section>}
