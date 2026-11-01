@@ -111,12 +111,12 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
     players: asArray(group.roster).map((p: any, i: number) => {
       const stats = statMap(p);
       const starter = p.starter === true;
-      const athleteId = p.athlete?.id;
       return {
-        key: String(athleteId ?? index + "-" + i),
+        key: String(p.athlete?.id ?? index + "-" + i),
         name: safeText(p.athlete?.shortName ?? p.athlete?.displayName ?? p.athlete?.fullName, "Player"),
         fullName: safeText(p.athlete?.displayName ?? p.athlete?.fullName ?? p.athlete?.shortName, "Player"),
-        photo: p.athlete?.headshot?.href ?? (athleteId ? `https://a.espncdn.com/i/headshots/soccer/players/full/${athleteId}.png` : ""),
+        espnPhoto: p.athlete?.headshot?.href ?? "",
+        photoList: [] as string[],
         jersey: safeText(p.jersey ?? p.athlete?.jersey, ""),
         pos: safeText(p.position?.abbreviation ?? p.position?.displayName, ""),
         place: num(p.formationPlace),
@@ -159,16 +159,20 @@ function collectStats(teams: any[], homeId: string) {
 }
 
 /* ---------- small components ---------- */
-function Avatar({ src, name, jersey, size }: { src: string; name: string; jersey: string; size: number }) {
-  const [failed, setFailed] = useState(false);
-  if (!src || failed) {
+function Avatar({ srcs, name, jersey, size }: { srcs: string[]; name: string; jersey: string; size: number }) {
+  const list = srcs.filter(Boolean);
+  const signature = list.join("|");
+  const [index, setIndex] = useState(0);
+  useEffect(() => { setIndex(0); }, [signature]);
+  if (index >= list.length) {
     return <span className="mc-jersey" style={{ width: size, height: size, fontSize: Math.round(size / 2.6) }}>{jersey || name.slice(0, 1)}</span>;
   }
   return <img
-    src={src}
+    key={list[index]}
+    src={list[index]}
     alt={name}
     loading="lazy"
-    onError={() => setFailed(true)}
+    onError={() => setIndex((i) => i + 1)}
     style={{ width: size, height: size, borderRadius: "50%", objectFit: "cover", objectPosition: "center top", background: "#2a3944", border: "2px solid #fff", display: "block" }}
   />;
 }
@@ -218,7 +222,7 @@ function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]
 function Chip({ p }: { p: any }) {
   return <div className="mc-chip" title={p.fullName} style={{ minWidth: 64 }}>
     <div style={{ position: "relative", width: 46, height: 46, marginBottom: 2 }}>
-      <Avatar src={p.photo} name={p.name} jersey={p.jersey} size={46} />
+      <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={46} />
       {p.rating !== null && <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", top: -6, right: -16, minWidth: 30, padding: "1px 4px", fontSize: 11 }}>{p.rating.toFixed(1)}</em>}
       {p.jersey && <span style={{ position: "absolute", bottom: -3, left: -6, background: "#0b1218", color: "#fff", border: "1px solid #3a4a56", borderRadius: 8, fontSize: 9, padding: "1px 5px", fontWeight: 700 }}>{p.jersey}</span>}
     </div>
@@ -230,17 +234,20 @@ function Chip({ p }: { p: any }) {
 function Lineups({ sides }: { sides: Side[] }) {
   const visible = sides.filter((s) => s.players.length);
   if (!visible.length) return <p className="mc-empty">Lineups have not been published for this match yet. They usually appear about an hour before kick-off.</p>;
-  return <div className="mc-lineups">{visible.map((side, index) => {
-    const starters = side.players.filter((p) => p.starter);
-    const subs = side.players.filter((p) => !p.starter);
-    const rows = starters.length ? formationRows(starters, side.formation).reverse() : [];
-    return <section key={side.team + index}>
-      <h4>{side.team}{side.formation && <small> · {side.formation}</small>}</h4>
-      {rows.length ? <div className="mc-pitch">{rows.map((row, r) => <div className="mc-pitch-row" key={r}>{row.map((p) => <Chip p={p} key={p.key} />)}</div>)}</div>
-        : <div className="mc-subs">{side.players.map((p) => <Chip p={p} key={p.key} />)}</div>}
-      {starters.length > 0 && subs.length > 0 && <><b className="mc-form-heading">Substitutes</b><div className="mc-subs">{subs.map((p) => <Chip p={p} key={p.key} />)}</div></>}
-    </section>;
-  })}</div>;
+  return <>
+    <div className="mc-lineups">{visible.map((side, index) => {
+      const starters = side.players.filter((p) => p.starter);
+      const subs = side.players.filter((p) => !p.starter);
+      const rows = starters.length ? formationRows(starters, side.formation).reverse() : [];
+      return <section key={side.team + index}>
+        <h4>{side.team}{side.formation && <small> · {side.formation}</small>}</h4>
+        {rows.length ? <div className="mc-pitch">{rows.map((row, r) => <div className="mc-pitch-row" key={r}>{row.map((p) => <Chip p={p} key={p.key} />)}</div>)}</div>
+          : <div className="mc-subs">{side.players.map((p) => <Chip p={p} key={p.key} />)}</div>}
+        {starters.length > 0 && subs.length > 0 && <><b className="mc-form-heading">Substitutes</b><div className="mc-subs">{subs.map((p) => <Chip p={p} key={p.key} />)}</div></>}
+      </section>;
+    })}</div>
+    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN and TheSportsDB. Players without a published photo show their shirt number.</p>
+  </>;
 }
 
 function PlayerRatings({ sides }: { sides: Side[] }) {
@@ -251,7 +258,7 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
     <div className="mc-top">{top.map((p) => (
       <div className="mc-top-card" key={p.team + p.key} style={{ justifyItems: "center", textAlign: "center" }}>
         <div style={{ position: "relative", width: 52, height: 52 }}>
-          <Avatar src={p.photo} name={p.name} jersey={p.jersey} size={52} />
+          <Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={52} />
           <em className={"mc-rating " + ratingClass(p.rating)} style={{ position: "absolute", bottom: -6, right: -14, fontSize: 11 }}>{p.rating.toFixed(1)}</em>
         </div>
         <b style={{ marginTop: 6 }}>{p.name}</b><small>{p.team}</small>
@@ -264,7 +271,7 @@ function PlayerRatings({ sides }: { sides: Side[] }) {
           <thead><tr><th>Player</th><th>Rating</th><th>G</th><th>A</th><th>Shots</th><th>On target</th><th>Saves</th></tr></thead>
           <tbody>{side.players.filter((p) => p.rating !== null).sort((a, b) => b.rating - a.rating).map((p) => (
             <tr key={p.key}>
-              <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar src={p.photo} name={p.name} jersey={p.jersey} size={26} />{p.name}</span></td>
+              <td><span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><Avatar srcs={p.photoList} name={p.name} jersey={p.jersey} size={26} />{p.name}</span></td>
               <td><em className={"mc-rating " + ratingClass(p.rating)}>{p.rating.toFixed(1)}</em></td>
               <td>{p.stats.totalGoals ?? 0}</td><td>{p.stats.goalAssists ?? 0}</td><td>{p.stats.totalShots ?? 0}</td><td>{p.stats.shotsOnTarget ?? 0}</td><td>{p.stats.saves ?? 0}</td>
             </tr>
@@ -308,6 +315,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const [busy, setBusy] = useState(true);
   const [tab, setTab] = useState<Tab>("Overview");
   const [updated, setUpdated] = useState<Date | null>(null);
+  const [photos, setPhotos] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
@@ -330,7 +338,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
         if (active && first) setBusy(false);
       }
     };
-    setBusy(true); setError(""); setData(null); setTab("Overview");
+    setBusy(true); setError(""); setData(null); setTab("Overview"); setPhotos({});
     load(true);
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [id, league]);
@@ -352,7 +360,40 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
 
   const teams = asArray(data?.boxscore?.teams);
   const statRows = useMemo(() => collectStats(teams, homeId), [data]);
-  const sides = useMemo(() => buildSides(data?.rosters, matchStarted), [data, matchStarted]);
+  const baseSides = useMemo(() => buildSides(data?.rosters, matchStarted), [data, matchStarted]);
+  const rosterKey = baseSides.map((s) => s.players.map((p) => p.key).join(",")).join("|");
+
+  // fetch photos for players ESPN has no photo for (starters first, retries while the free limit resets)
+  useEffect(() => {
+    let queue = baseSides.flatMap((s) =>
+      [...s.players].filter((p) => !p.espnPhoto).sort((a, b) => Number(b.starter) - Number(a.starter)).map((p) => ({ name: p.fullName, team: s.team }))
+    );
+    if (!queue.length) return;
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = async (attempt: number) => {
+      if (!active || !queue.length) return;
+      try {
+        const response = await fetch("/api/player-photos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: queue.slice(0, 25) }) });
+        const payload = await response.json();
+        if (!active) return;
+        const resolved = payload?.photos ?? {};
+        const found: Record<string, string> = {};
+        for (const [name, url] of Object.entries(resolved)) if (url) found[name] = url as string;
+        if (Object.keys(found).length) setPhotos((prev) => ({ ...prev, ...found }));
+        queue = queue.filter((q) => !(q.name in resolved));
+      } catch { /* try again below */ }
+      if (queue.length && attempt < 8) timer = setTimeout(() => run(attempt + 1), 25000);
+    };
+    run(0);
+    return () => { active = false; if (timer) clearTimeout(timer); };
+  }, [rosterKey]);
+
+  const sides = useMemo(() => baseSides.map((s) => ({
+    ...s,
+    players: s.players.map((p) => ({ ...p, photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[] }))
+  })), [baseSides, photos]);
+
   const events = useMemo(() => {
     const base = asArray(data?.keyEvents).length ? asArray(data?.keyEvents) : asArray(data?.plays);
     const seen = new Set<string>();
