@@ -6,6 +6,7 @@ type Props = { id: string; league: string; home: string; away: string; homeScore
 type RecordValue = Record<string, any>;
 type Tab = "Overview" | "Statistics" | "Lineups" | "Commentary" | "Team form";
 type View = "Performance" | "Nationality" | "Age" | "Height";
+type Detail = { born?: string; nationality?: string; height?: string };
 
 const REFRESH_MS = 20000;
 const VIEWS: View[] = ["Performance", "Nationality", "Age", "Height"];
@@ -47,6 +48,21 @@ function formatDate(value: any) {
 function withHash(value: any) {
   const s = safeText(value, "").replace("#", "");
   return /^[0-9a-f]{6}$/i.test(s) ? "#" + s : "";
+}
+function ageFrom(born?: string) {
+  if (!born) return "";
+  const d = new Date(born);
+  if (Number.isNaN(d.getTime())) return "";
+  const years = Math.floor((Date.now() - d.getTime()) / 31557600000);
+  return years > 0 && years < 60 ? String(years) : "";
+}
+function heightFrom(raw?: string) {
+  if (!raw) return "";
+  const cm = /(\d{3})\s*cm/i.exec(raw);
+  if (cm) return cm[1] + " cm";
+  const m = /(\d(?:[.,]\d{1,2})?)\s*m/i.exec(raw);
+  if (m) return Math.round(parseFloat(m[1].replace(",", ".")) * 100) + " cm";
+  return "";
 }
 function eventLabel(event: any) {
   return safeText(event.type?.text ?? event.type?.name ?? event.type ?? event.shortText ?? event.text ?? event.description, "Match event");
@@ -120,7 +136,6 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
       const stats = statMap(p);
       const starter = p.starter === true;
       const a = p.athlete ?? {};
-      const heightRaw = Number(a.height);
       return {
         key: String(a.id ?? index + "-" + i),
         name: safeText(a.shortName ?? a.displayName ?? a.fullName, "Player"),
@@ -133,7 +148,7 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
         age: a.age ? String(a.age) : "",
         nationality: safeText(a.citizenshipCountry?.abbreviation ?? a.citizenship ?? a.flag?.alt, ""),
         flag: a.flag?.href ?? "",
-        height: a.displayHeight ? String(a.displayHeight) : Number.isFinite(heightRaw) && heightRaw > 0 ? Math.round(heightRaw < 100 ? heightRaw * 2.54 : heightRaw) + " cm" : "",
+        height: a.displayHeight ? String(a.displayHeight) : "",
         place: num(p.formationPlace),
         starter,
         stats,
@@ -148,13 +163,37 @@ function buildSides(rosters: any, matchStarted: boolean): Side[] {
     })
   }));
 }
-function formationRows(starters: any[], formation: string): any[][] {
+
+// ESPN's formationPlace is a position slot (not a row), so rows are built from the position names
+function levelOf(pos: string): number {
+  const p = pos.toUpperCase();
+  if (/^G/.test(p)) return 0;
+  if (/^(CD|SW|RB|LB|RWB|LWB|WB)/.test(p)) return 1;
+  if (/^DM/.test(p)) return 2;
+  if (/^(CM|RM|LM)/.test(p)) return 3;
+  if (/^AM/.test(p)) return 4;
+  if (/^(F|CF|ST|LF|RF|SS|RW|LW)/.test(p)) return 5;
+  return 3;
+}
+function sideRank(pos: string): number { // -1 = team's left, 1 = team's right
+  const p = pos.toUpperCase();
+  if (/-L$/.test(p) || /^L[A-Z]/.test(p)) return -1;
+  if (/-R$/.test(p) || /^R[A-Z]/.test(p)) return 1;
+  return 0;
+}
+function formationRows(starters: any[], formation: string, isHome: boolean): any[][] {
   const parts = formation.split("-").map((n) => Number.parseInt(n, 10)).filter((n) => n > 0);
-  const sorted = [...starters].sort((a, b) => a.place - b.place);
-  if (!parts.length || sorted.some((p) => !p.place) || parts.reduce((a, b) => a + b, 0) !== sorted.length - 1) return [sorted];
+  const backs = parts[0] ?? 0;
+  const items = starters.map((p) => ({ p, level: levelOf(p.pos) }));
+  if (backs && items.filter((x) => x.level === 1).length > backs) {
+    items.forEach((x) => { if (x.level === 1 && !/^(CD|SW)/i.test(x.p.pos)) x.level = 3; }); // wing-backs
+  }
+  const order = (a: any, b: any) => (isHome ? sideRank(b.pos) - sideRank(a.pos) : sideRank(a.pos) - sideRank(b.pos)) || a.place - b.place;
+  const sorted = items.sort((a, b) => a.level - b.level || order(a.p, b.p)).map((x) => x.p);
+  if (!parts.length || parts.reduce((a, b) => a + b, 0) !== sorted.length - 1 || levelOf(sorted[0].pos) !== 0) return [sorted];
   const rows: any[][] = [sorted.slice(0, 1)];
   let i = 1;
-  for (const n of parts) { rows.push(sorted.slice(i, i + n)); i += n; }
+  for (const n of parts) { rows.push(sorted.slice(i, i + n).sort(order)); i += n; }
   return rows;
 }
 
@@ -240,7 +279,7 @@ const PITCH_LINE = "#3b444b";
 const iconBadge: React.CSSProperties = { position: "absolute", minWidth: 20, height: 20, padding: "0 3px", borderRadius: 10, background: "#fff", color: "#111", fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, boxShadow: "0 1px 3px rgba(0,0,0,.5)" };
 
 function ValuePill({ p, view }: { p: any; view: View }) {
-  const base: React.CSSProperties = { position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 800, color: "#fff", padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 };
+  const base: React.CSSProperties = { position: "absolute", bottom: -9, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontWeight: 800, color: "#fff", padding: "1px 6px", borderRadius: 3, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4, maxWidth: 84, overflow: "hidden", textOverflow: "ellipsis" };
   if (view === "Performance") {
     if (p.rating === null) return null;
     return <span style={{ ...base, background: ratingColor(p.rating) }}>{p.rating.toFixed(1)}</span>;
@@ -261,7 +300,7 @@ function PitchPlayer({ p, view }: { p: any; view: View }) {
         : p.yellow > 0 ? <i style={{ position: "absolute", top: -4, left: -6, width: 11, height: 15, borderRadius: 2, background: "#f5c518", border: "1px solid #fff" }} /> : null}
       {p.goals > 0 && <span style={{ ...iconBadge, top: -6, right: -8 }}>⚽{p.goals > 1 ? p.goals : ""}</span>}
       {p.assists > 0 && <span style={{ ...iconBadge, top: 16, right: -12 }}>👟{p.assists > 1 ? p.assists : ""}</span>}
-      {(p.subbedOut || p.subbedIn) && <span style={{ ...iconBadge, top: 18, left: -10, color: p.subbedOut ? "#d63a2f" : "#2fb344" }}>{p.subbedOut ? "⇄" : "⇄"}</span>}
+      {(p.subbedOut || p.subbedIn) && <span style={{ ...iconBadge, top: 18, left: -10, color: p.subbedOut ? "#d63a2f" : "#2fb344" }}>⇄</span>}
       <ValuePill p={p} view={view} />
     </div>
     <div style={{ marginTop: 13, fontSize: 11.5, fontWeight: 700, lineHeight: 1.15, padding: "0 2px" }}>
@@ -307,12 +346,12 @@ function Lineups({ sides, view, setView }: { sides: Side[]; view: View; setView:
   if (!visible.length) return <p className="mc-empty">Lineups have not been published for this match yet. They usually appear about an hour before kick-off.</p>;
   const home = visible.find((s) => s.homeAway === "home") ?? visible[0];
   const away = visible.find((s) => s !== home);
-  const rowsOf = (side: Side) => {
+  const rowsOf = (side: Side, isHome: boolean) => {
     const starters = side.players.filter((p) => p.starter);
-    return starters.length ? formationRows(starters, side.formation) : [side.players];
+    return starters.length ? formationRows(starters, side.formation, isHome) : [side.players];
   };
-  const homeRows = rowsOf(home);
-  const awayRows = away ? [...rowsOf(away)].reverse() : [];
+  const homeRows = rowsOf(home, true);
+  const awayRows = away ? [...rowsOf(away, false)].reverse() : [];
   const rowHeight = 118;
   const halfHeight = Math.max(homeRows.length, awayRows.length, 4) * rowHeight;
   const avgOf = (s: Side) => {
@@ -329,12 +368,11 @@ function Lineups({ sides, view, setView }: { sides: Side[]; view: View; setView:
         <button key={v} onClick={() => setView(v)} style={{ border: 0, cursor: "pointer", whiteSpace: "nowrap", borderRadius: 20, padding: "9px 16px", fontWeight: 700, fontSize: 13, background: view === v ? "#e9edf0" : "#0b1015", color: view === v ? "#111" : "#e8edf1" }}>{v}</button>
       ))}
     </div>
-    {missing && <p className="mc-muted" style={{ marginBottom: 10 }}>{view} is not published for this match by the data provider.</p>}
+    {missing && <p className="mc-muted" style={{ marginBottom: 10 }}>{view} is still loading, or is not available for these players. It fills in over about a minute.</p>}
 
     <div style={{ background: "#0f151a", borderRadius: 10, overflow: "hidden", border: "1px solid #26343d" }}>
       <TeamHeader side={home} avg={avgOf(home)} />
       <div style={{ position: "relative", background: "#141b21", borderTop: line, borderBottom: away ? "none" : line }}>
-        {/* pitch markings */}
         <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "46%", height: 150, borderLeft: line, borderRight: line, borderBottom: line }} />
         <div style={{ position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)", width: "24%", height: 62, borderLeft: line, borderRight: line, borderBottom: line }} />
         {away && <>
@@ -359,7 +397,7 @@ function Lineups({ sides, view, setView }: { sides: Side[]; view: View; setView:
         </div>
       </section>;
     })}
-    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: ESPN, Wikipedia and TheSportsDB. Players without a published photo show their shirt number. Ratings are calculated live from match stats.</p>
+    <p className="mc-muted" style={{ marginTop: 12 }}>Player photos: Wikipedia and TheSportsDB. Age, nationality and height: TheSportsDB. Ratings are calculated live from match stats.</p>
   </>;
 }
 
@@ -430,6 +468,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const [view, setView] = useState<View>("Performance");
   const [updated, setUpdated] = useState<Date | null>(null);
   const [photos, setPhotos] = useState<Record<string, string>>({});
+  const [details, setDetails] = useState<Record<string, Detail>>({});
 
   useEffect(() => {
     let active = true;
@@ -452,7 +491,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
         if (active && first) setBusy(false);
       }
     };
-    setBusy(true); setError(""); setData(null); setTab("Overview"); setPhotos({});
+    setBusy(true); setError(""); setData(null); setTab("Overview"); setPhotos({}); setDetails({});
     load(true);
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [id, league]);
@@ -487,17 +526,16 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
     });
   }, [data]);
 
-  // goals and assists per player, read from the match events
+  // goals and assists per player, read from the match events (first participant scored, second assisted)
   const tally = useMemo(() => {
     const goals: Record<string, number> = {};
     const assists: Record<string, number> = {};
     for (const e of events) {
       if (!isGoalEvent(e)) continue;
-      const own = /own goal/i.test(eventLabel(e) + " " + safeText(e.text, ""));
+      if (/own goal/i.test(eventLabel(e) + " " + safeText(e.text, ""))) continue;
       const parts = asArray(e.participants);
       const scorer = parts[0]?.athlete?.id;
       const assister = parts[1]?.athlete?.id;
-      if (own) continue;
       if (scorer) goals[String(scorer)] = (goals[String(scorer)] ?? 0) + 1;
       if (assister) assists[String(assister)] = (assists[String(assister)] ?? 0) + 1;
     }
@@ -526,11 +564,10 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
     return list;
   }, [events, baseSides, homeId]);
 
-  // look up photos for every player ESPN has none for: starters of both teams first, then subs
+  // photos + age/nationality/height for every player: starters of both teams first, then subs
   useEffect(() => {
     let queue = baseSides
       .flatMap((s) => s.players.map((p, index) => ({ p, team: s.team, index })))
-      .filter((x) => !x.p.espnPhoto)
       .sort((a, b) => Number(!a.p.starter) - Number(!b.p.starter) || a.index - b.index)
       .map((x) => ({ name: x.p.fullName, team: x.team }));
     if (!queue.length) return;
@@ -542,13 +579,18 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
         const response = await fetch("/api/player-photos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ players: queue.slice(0, 30) }) });
         const payload = await response.json();
         if (!active) return;
-        const resolved = payload?.photos ?? {};
-        const found: Record<string, string> = {};
-        for (const [name, url] of Object.entries(resolved)) if (url) found[name] = url as string;
-        if (Object.keys(found).length) setPhotos((prev) => ({ ...prev, ...found }));
-        queue = queue.filter((q) => !(q.name in resolved));
+        const results: Record<string, any> = payload?.results ?? {};
+        const foundPhotos: Record<string, string> = {};
+        const foundDetails: Record<string, Detail> = {};
+        for (const [name, r] of Object.entries(results)) {
+          if (r?.photo) foundPhotos[name] = r.photo;
+          if (r?.born || r?.nationality || r?.height) foundDetails[name] = { born: r.born, nationality: r.nationality, height: r.height };
+        }
+        if (Object.keys(foundPhotos).length) setPhotos((prev) => ({ ...prev, ...foundPhotos }));
+        if (Object.keys(foundDetails).length) setDetails((prev) => ({ ...prev, ...foundDetails }));
+        queue = queue.filter((q) => !results[q.name]?.done);
       } catch { /* try again below */ }
-      if (queue.length && attempt < 15) timer = setTimeout(() => run(attempt + 1), 6000);
+      if (queue.length && attempt < 20) timer = setTimeout(() => run(attempt + 1), 4000);
     };
     run(0);
     return () => { active = false; if (timer) clearTimeout(timer); };
@@ -564,10 +606,20 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
         const goals = Math.max(p.goals, tally.goals[p.key] ?? 0);
         const assists = Math.max(p.assists, tally.assists[p.key] ?? 0);
         const rating = p.rating === null ? null : Math.max(3, Math.min(10, Math.round((p.rating + (goals - p.goals) * 1.2 + (assists - p.assists) * 0.8) * 10) / 10));
-        return { ...p, goals, assists, rating, photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[] };
+        const d = details[p.fullName];
+        return {
+          ...p,
+          goals,
+          assists,
+          rating,
+          age: p.age || ageFrom(d?.born),
+          nationality: p.nationality || d?.nationality || "",
+          height: p.height || heightFrom(d?.height),
+          photoList: [p.espnPhoto, photos[p.fullName]].filter(Boolean) as string[]
+        };
       })
     };
-  }), [baseSides, photos, tally, data]);
+  }), [baseSides, photos, details, tally, data]);
 
   const commentary = asArray(data?.commentary);
 
