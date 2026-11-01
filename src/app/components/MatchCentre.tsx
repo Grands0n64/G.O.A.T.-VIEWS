@@ -77,8 +77,8 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const homeTeam = competitors.find((x: any) => x.homeAway === "home") ?? competitors[0];
   const awayTeam = competitors.find((x: any) => x.homeAway === "away") ?? competitors[1];
   const status = text(competition.status?.type?.shortDetail ?? competition.status?.type?.detail ?? data?.header?.season?.name, initialStatus || "Match details");
-  const homeName = text(homeTeam?.team?.displayName ?? homeTeam?.team?.name, home);
-  const awayName = text(awayTeam?.team?.displayName ?? awayTeam?.team?.name, away);
+  const homeName = text(homeNameTeam?.team?.name, home);
+  const awayName = text(awayNameTeam?.team?.name, away);
   const homeScore = text(homeTeam?.score, initialHomeScore === null ? "—" : String(initialHomeScore));
   const awayScore = text(awayTeam?.score, initialAwayScore === null ? "—" : String(initialAwayScore));
   const venue = text(competition.venue?.fullName ?? competition.venue?.address?.city, initialVenue || "");
@@ -86,7 +86,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   const hasFinalScore = Number.isFinite(numericHome) && Number.isFinite(numericAway) && (competition.status?.type?.completed === true || /final|ft|full time/i.test(status));
   const resultAnalysis = hasFinalScore
     ? numericHome === numericAway ? `${homeName} and ${awayName} finished level at ${homeScore}–${awayScore}.`
-      : `${numericHome > numericAway ? (homeTeam?.team?.displayName ?? home) : (awayTeam?.team?.displayName ?? away)} won ${Math.abs(numericHome - numericAway)}-goal${Math.abs(numericHome - numericAway) === 1 ? "" : "s"} clear, scoring ${Math.max(numericHome, numericAway)} and conceding ${Math.min(numericHome, numericAway)}.`
+      : `${numericHome > numericAway ? (homeName) : (awayName)} won ${Math.abs(numericHome - numericAway)}-goal${Math.abs(numericHome - numericAway) === 1 ? "" : "s"} clear, scoring ${Math.max(numericHome, numericAway)} and conceding ${Math.min(numericHome, numericAway)}.`
     : `The current score is ${homeScore}–${awayScore}. Match analysis will expand as verified match events and statistics are supplied.`;
   const teams = data?.boxscore?.teams ?? [];
   const players = data?.boxscore?.players ?? [];
@@ -104,6 +104,6 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
       {tab === "Statistics" && <><section className="mc-section"><h3>Team statistics</h3><TeamStats teams={teams}/></section><section className="mc-section"><h3>Player statistics</h3><PlayerStats groups={players}/></section></>}
       {tab === "Lineups" && <section className="mc-section"><h3>Starting lineups</h3><Lineups rosters={data?.rosters}/></section>}
       {tab === "Commentary" && <section className="mc-section"><h3>Match commentary</h3><Commentary data={data?.commentary}/></section>}
-    </>}</div>
+    </div>
   </section></div>;
 }
