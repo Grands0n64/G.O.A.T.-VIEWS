@@ -78,7 +78,10 @@ export default function Highlights({ home, away, league, date }: { home: string;
 
   if (!state || !state.configured) return null;
   const videos = state.videos;
-  if (videos.length === 0) return null;
+  if (videos.length === 0) return <section className="mc-section">
+    <h3>🎬 Latest {league} highlights</h3>
+    <p className="mc-muted">No playable official highlights were returned for this competition right now. Check back for new uploads.</p>
+  </section>;
 
   const heading = state.scope === "match" ? "Match highlights" : state.scope === "round" ? "Matchday highlights" : "Latest " + league + " highlights";
 
@@ -99,7 +102,7 @@ export default function Highlights({ home, away, league, date }: { home: string;
                 onFailed={(code) => {
                   setFailed((list) => (list.includes(id) ? list : [...list, id]));
                   setOpen(null);
-                  setNotice(reasonFor(code) + " We removed it, so try another one.");
+                  setNotice(reasonFor(code) + " Use the Watch on YouTube link on this card.");
                 }}
               />
             </div>
