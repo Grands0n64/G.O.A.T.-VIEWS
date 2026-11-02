@@ -10,7 +10,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", "de", "of"]);
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
-const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments/i;
+const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments|goals/i;
 const THROWBACK = /classic|throwback|relive|on this day|best of|history|rewind|years ago/i;
 const ROUND = /matchweek|weekend|round|jornada|giornata|spieltag|journ[eé]e|goals/i;
 
@@ -134,7 +134,8 @@ export async function GET(req: NextRequest) {
   const hasDate = Number.isFinite(kickoff);
   const debug = !!req.nextUrl.searchParams.get("debug");
   const country = (req.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
-  const sources = HIGHLIGHT_CHANNELS[league] ?? (debug ? HIGHLIGHT_CHANNELS["Premier League"] : []);
+  const bodySources = league.startsWith("FIFA") ? HIGHLIGHT_CHANNELS["FIFA"] : league.startsWith("UEFA") || league === "Euro Qualifying" || league === "Women's Euro" ? HIGHLIGHT_CHANNELS["UEFA"] : [];
+  const sources = HIGHLIGHT_CHANNELS[league] ?? (bodySources.length ? bodySources : (debug ? HIGHLIGHT_CHANNELS["Premier League"] : []));
 
   if (!key) return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
   // hidden when this league has no official channel set up
