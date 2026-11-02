@@ -77,7 +77,7 @@ export default function Highlights({ home, away, league, date }: { home: string;
   }, [notice]);
 
   if (!state || !state.configured) return null;
-  const videos = state.videos.filter((video) => !failed.includes(videoIdOf(video)));
+  const videos = state.videos;
   if (videos.length === 0) return null;
 
   const heading = state.scope === "match" ? "Match highlights" : state.scope === "round" ? "Matchday highlights" : "Latest " + league + " highlights";
@@ -89,7 +89,9 @@ export default function Highlights({ home, away, league, date }: { home: string;
       {videos.map((video) => {
         const id = videoIdOf(video);
         return <div key={id} style={{ background: "#121d26", border: "1px solid #293640", borderRadius: 10, overflow: "hidden" }}>
-          {open === id
+          {failed.includes(id)
+            ? <div style={{ position: "relative", minHeight: 150, display: "grid", placeItems: "center", gap: 8, padding: 16, background: "#080d12", color: "#fff", textAlign: "center" }}><span>This video cannot be embedded here.</span><a href={"https://www.youtube.com/watch?v=" + id} target="_blank" rel="noreferrer" style={{ color: "#8fc7ff", textDecoration: "underline" }}>Watch on YouTube</a></div>
+            : open === id
             ? <div style={{ position: "relative", paddingTop: "56.25%", background: "#000" }}>
               <Player
                 videoId={id}
@@ -111,6 +113,6 @@ export default function Highlights({ home, away, league, date }: { home: string;
         </div>;
       })}
     </div>
-    <p className="mc-muted" style={{ marginTop: 10 }}>Highlights from the league's official YouTube channel. Some videos are limited to certain countries.</p>
+    <p className="mc-muted" style={{ marginTop: 10 }}>Videos are embedded from their publishing YouTube channels. Some publishers restrict playback on other websites or in certain countries.</p>
   </section>;
 }
