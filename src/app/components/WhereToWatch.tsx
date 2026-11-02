@@ -2,16 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { AFFILIATE, BROADCASTERS, COUNTRIES, type CountryCode } from "../broadcasters";
-import { LIVE_CHANNELS } from "../liveChannels";
+import YouTubePlayer from "./YouTubePlayer";
+
+type LiveVideo = { id: string; title: string; channel: string };
 
 function guessFromLocale(): CountryCode {
   const region = (typeof navigator !== "undefined" ? navigator.language : "").split("-")[1]?.toUpperCase();
   return COUNTRIES.find((c) => c.code === region)?.code ?? "US";
 }
 
-export default function WhereToWatch({ league }: { league: string; broadcasts?: any }) {
+export default function WhereToWatch({ league, home, away, live }: { league: string; home?: string; away?: string; live?: boolean }) {
   const [country, setCountry] = useState<CountryCode>("US");
+  const [streams, setStreams] = useState<LiveVideo[]>([]);
   const [playing, setPlaying] = useState<string | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -26,12 +31,52 @@ export default function WhereToWatch({ league }: { league: string; broadcasts?: 
     return () => { active = false; };
   }, []);
 
+  // while the match is live, look for an official YouTube stream of this exact match
+  useEffect(() => {
+    if (!live || !home || !away) { setStreams([]); return; }
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const run = () => {
+      const query = "league=" + encodeURIComponent(league) + "&home=" + encodeURIComponent(home) + "&away=" + encodeURIComponent(away) + "&live=1";
+      fetch("/api/live-streams?" + query, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => { if (active) setStreams(d.videos ?? []); })
+        .catch(() => {})
+        .finally(() => { if (active) timer = setTimeout(run, 60000); });
+    };
+    run();
+    return () => { active = false; if (timer) clearTimeout(timer); };
+  }, [league, home, away, live]);
+
   const items = BROADCASTERS[league]?.[country] ?? [];
-  const channels = LIVE_CHANNELS.filter((ch) => ch.leagues.includes(league) && (!ch.countries || ch.countries.includes(country)));
+  const available = streams.filter((s) => !failed.includes(s.id));
   const countryName = COUNTRIES.find((c) => c.code === country)?.name ?? "";
   const hasAffiliate = items.some((item) => AFFILIATE[item.name]);
 
   return <section style={{ padding: "14px 20px", borderBottom: "1px solid #293640", background: "#0f1a22" }}>
+    {available.length > 0 && <div style={{ marginBottom: 16 }}>
+      <b style={{ fontSize: 13, color: "#f2f6f8" }}>🔴 Live now on the official YouTube channel</b>
+      {notice && <p style={{ margin: "6px 0 0", fontSize: 11, color: "#e8872a" }}>{notice}</p>}
+      {available.map((stream) => (
+        <div key={stream.id} style={{ marginTop: 8 }}>
+          {playing === stream.id
+            ? <div style={{ position: "relative", paddingTop: "56.25%", background: "#000", borderRadius: 9, overflow: "hidden" }}>
+              <YouTubePlayer
+                videoId={stream.id}
+                title={stream.title}
+                onFailed={() => {
+                  setFailed((list) => (list.includes(stream.id) ? list : [...list, stream.id]));
+                  setPlaying(null);
+                  setNotice("That stream couldn't be played here. The owner may not allow it on other websites or in your country.");
+                }}
+              />
+            </div>
+            : <button onClick={() => setPlaying(stream.id)} style={{ width: "100%", border: "1px solid #2c3b46", cursor: "pointer", borderRadius: 9, padding: "12px 14px", background: "#18232c", color: "#f2f6f8", fontSize: 13, fontWeight: 800, textAlign: "left" }}>▶ Watch live · {stream.channel}</button>}
+          <p style={{ margin: "6px 0 0", fontSize: 10.5, color: "#91a0aa" }}>{stream.title}</p>
+        </div>
+      ))}
+    </div>}
+
     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
       <b style={{ fontSize: 13, color: "#f2f6f8" }}>📺 Where to watch</b>
       <div style={{ display: "flex", gap: 6, overflowX: "auto" }}>
@@ -41,26 +86,6 @@ export default function WhereToWatch({ league }: { league: string; broadcasts?: 
       </div>
     </div>
 
-    {channels.length > 0 && <div style={{ marginTop: 14 }}>
-      <b style={{ fontSize: 12.5, color: "#f2f6f8" }}>🔴 Free live on the official YouTube channel</b>
-      {channels.map((ch) => (
-        <div key={ch.channelId} style={{ marginTop: 8 }}>
-          {playing === ch.channelId
-            ? <div style={{ position: "relative", paddingTop: "56.25%", background: "#000", borderRadius: 9, overflow: "hidden" }}>
-              <iframe
-                src={"https://www.youtube.com/embed/live_stream?channel=" + encodeURIComponent(ch.channelId) + "&autoplay=1"}
-                title={ch.name}
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-                allowFullScreen
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
-              />
-            </div>
-            : <button onClick={() => setPlaying(ch.channelId)} style={{ width: "100%", border: "1px solid #2c3b46", cursor: "pointer", borderRadius: 9, padding: "12px 14px", background: "#18232c", color: "#f2f6f8", fontSize: 13, fontWeight: 800, textAlign: "left" }}>▶ Watch {ch.name} live</button>}
-          <p style={{ margin: "6px 0 0", fontSize: 10.5, color: "#91a0aa", lineHeight: 1.4 }}>{ch.note ?? "Official channel. It shows whatever the channel is streaming right now, which may be a different match."}</p>
-        </div>
-      ))}
-    </div>}
-
     {items.length > 0 ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
       {items.map((item) => (
         <a key={item.name} href={AFFILIATE[item.name] ?? item.url} target="_blank" rel="sponsored noopener noreferrer"
@@ -69,7 +94,7 @@ export default function WhereToWatch({ league }: { league: string; broadcasts?: 
           {item.note && <span style={{ fontSize: 10.5, color: "#91a0aa", lineHeight: 1.35 }}>{item.note}</span>}
         </a>
       ))}
-    </div> : channels.length === 0 && <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "#91a0aa" }}>We don't have broadcaster details for {league} in {countryName} yet.</p>}
+    </div> : <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "#91a0aa" }}>We don't have broadcaster details for {league} in {countryName} yet.</p>}
 
     {hasAffiliate && <p style={{ margin: "8px 0 0", fontSize: 10, color: "#6f7f8b", lineHeight: 1.5 }}>We may earn a commission if you sign up through these links.</p>}
   </section>;
