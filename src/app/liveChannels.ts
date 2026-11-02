@@ -1,14 +1,17 @@
-import type { CountryCode } from "./broadcasters";
-
 export type LiveChannel = {
   name: string;
-  channelId: string;      // starts with UC, copied from the channel's "Share channel" menu
-  leagues: string[];      // league names exactly as in leagues.ts
-  countries?: CountryCode[]; // leave out if the stream works worldwide
+  leagues: string[];     // league names exactly as in leagues.ts
+  handle?: string;       // the @name on the channel page, without the @
+  channelId?: string;    // a channel ID you are sure about
+  query?: string;        // used to search for the channel when no handle is known
+  hints: string[];       // lowercase words the real channel name must contain (not needed with channelId)
   note?: string;
 };
 
-// Only add OFFICIAL channels (the league, club or federation that owns the matches).
-// Example, with the ID replaced by the real one you copied:
-//   { name: "Women's Super League", channelId: "UCxxxxxxxxxxxxxxxxxxxxxx", leagues: ["Women's Super League"], countries: ["GB"], note: "Free live matches in the UK and Ireland" },
-export const LIVE_CHANNELS: LiveChannel[] = [];
+// Only OFFICIAL channels: the league or its official broadcaster. Never re-stream channels.
+export const LIVE_CHANNELS: LiveChannel[] = [
+  { name: "Barclays WSL", leagues: ["Women's Super League"], query: "Barclays Women's Super League", hints: ["wsl", "super league"] },
+  { name: "DAZN Women's Football", leagues: ["UEFA Women's Champions League", "Liga F"], channelId: "UCxgii5f9u4YgXCeubCozbEA", hints: [] },
+  { name: "Canal GOAT", leagues: ["Copa Libertadores", "Copa Sudamericana"], query: "Canal GOAT", hints: ["canal goat", "canalgoat"] },
+  { name: "CazéTV", leagues: ["Brazil Serie A"], handle: "CazeTV", hints: ["caz"] }
+];
