@@ -82,7 +82,14 @@ export const LEAGUES: League[] = [
   f("cyp.1", "Cypriot First Division", "Cyprus"),
   f("isr.1", "Israeli Premier League", "Israel"),
   f("uefa.super_cup", "UEFA Super Cup", "Europe"),
+  f("uefa.champions_qual", "UEFA Champions League Qualifying", "Europe"),
+  f("uefa.europa_qual", "UEFA Europa League Qualifying", "Europe"),
+  f("uefa.europa.conf_qual", "UEFA Conference League Qualifying", "Europe"),
   f("uefa.wchampions", "UEFA Women's Champions League", "Europe"),
+  f("uefa.euro_u21", "UEFA European Under-21 Championship", "Europe"),
+  f("uefa.euro_u21_qual", "UEFA European Under-21 Qualifying", "Europe"),
+  f("uefa.euro.u19", "UEFA European Under-19 Championship", "Europe"),
+  f("uefa.w.nations", "UEFA Women's Nations League", "Europe"),
 
   // ---- North, Central and South America ----
   f("usa.2", "USL Championship", "USA"),
@@ -162,6 +169,7 @@ export const LEAGUES: League[] = [
   f("fifa.worldq.concacaf", "World Cup Qualifying (CONCACAF)", "North America"),
   f("fifa.worldq.afc", "World Cup Qualifying (AFC)", "Asia"),
   f("fifa.worldq.caf", "World Cup Qualifying (CAF)", "Africa"),
+  f("fifa.worldq.ofc", "World Cup Qualifying (OFC)", "Oceania"),
   f("uefa.euro", "UEFA European Championship", "Europe"),
   f("uefa.euroq", "Euro Qualifying", "Europe"),
   f("uefa.nations", "UEFA Nations League", "Europe"),
