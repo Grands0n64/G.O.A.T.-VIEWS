@@ -105,8 +105,10 @@ export async function GET(req: NextRequest) {
 
     const homeKey = normalize(home);
     const awayKey = normalize(away);
+    // Highlightly documents both VERIFIED and UNVERIFIED clips. The
+    // embedUrl is the actual signal that an in-page player URL is supplied;
+    // filtering to VERIFIED alone incorrectly hides otherwise embeddable clips.
     const embedded = items
-      .filter((item) => (item.type ?? "").toUpperCase() === "VERIFIED")
       .map((item) => ({ item, embedUrl: safeEmbedUrl(item.embedUrl) }))
       .filter((entry): entry is { item: HighlightlyItem; embedUrl: string } => !!entry.embedUrl);
 
@@ -129,7 +131,7 @@ export async function GET(req: NextRequest) {
       source: item.source,
       channel: item.channel,
       category: item.category,
-      verified: true
+      verified: (item.type ?? "").toUpperCase() === "VERIFIED"
     }));
 
     return NextResponse.json({
