@@ -211,7 +211,7 @@ export async function GET(req: NextRequest) {
 
     const videos = candidates
       .filter((v) => usable.has(v.id))
-      .slice(0, 6)
+      .slice(0, 5)
       .map((v) => ({ id: v.id, title: v.title, src: "https://www.youtube.com/embed/" + v.id + "?rel=0", thumbnail: v.thumbnail, competition: league, date: v.date }));
 
     return NextResponse.json({ configured: true, videos, scope });
