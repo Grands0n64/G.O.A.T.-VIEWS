@@ -650,7 +650,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
           <div style={{ textAlign: "left" }}>{scorers.away.map((s, i) => <div key={i}>{scorerLine(s)}</div>)}</div>
         </div>}
         <div className="mc-venue">{[venue, competition?.venue?.address?.city].filter(Boolean).join(" · ")}{updated && isLive ? ` · Updated ${updated.toLocaleTimeString()}` : ""}</div></header>
-        <WhereToWatch league={league} />
+        <WhereToWatch league={league} home={homeName} away={awayName} live={isLive} />
         <nav className="mc-tabs" aria-label="Match sections">{tabs.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}</nav>
         <div className="mc-content">
           {busy && <p className="mc-loading">Loading match information…</p>}
