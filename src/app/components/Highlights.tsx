@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 
 type Video = { title: string; src: string; thumbnail?: string; competition?: string; date?: string };
+type Scope = "match" | "league" | "any";
 
 export default function Highlights({ home, away, league }: { home: string; away: string; league: string }) {
-  const [state, setState] = useState<{ videos: Video[]; matched: boolean; configured: boolean } | null>(null);
+  const [state, setState] = useState<{ videos: Video[]; scope: Scope; configured: boolean } | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   useEffect(() => {
@@ -14,15 +15,17 @@ export default function Highlights({ home, away, league }: { home: string; away:
     const query = "home=" + encodeURIComponent(home) + "&away=" + encodeURIComponent(away) + "&league=" + encodeURIComponent(league);
     fetch("/api/highlights?" + query, { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => { if (active) setState({ videos: d.videos ?? [], matched: !!d.matched, configured: d.configured !== false }); })
-      .catch(() => { if (active) setState({ videos: [], matched: false, configured: true }); });
+      .then((d) => { if (active) setState({ videos: d.videos ?? [], scope: (d.scope as Scope) ?? "league", configured: d.configured !== false }); })
+      .catch(() => { if (active) setState({ videos: [], scope: "league", configured: true }); });
     return () => { active = false; };
   }, [home, away, league]);
 
   if (!state || !state.configured) return null;
 
+  const heading = state.scope === "match" ? "Match highlights" : state.scope === "league" ? "Latest " + league + " highlights" : "Latest football highlights";
+
   return <section className="mc-section">
-    <h3>🎬 {state.matched ? "Match highlights" : "Latest " + league + " highlights"}</h3>
+    <h3>🎬 {heading}</h3>
     {state.videos.length === 0
       ? <p className="mc-empty">No official highlights for this match yet. They usually appear soon after full time.</p>
       : <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
