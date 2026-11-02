@@ -4,8 +4,8 @@ import { HIGHLIGHT_CHANNELS, type HighlightSource } from "../../highlightChannel
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
+const API = "https://www.googleapis.com/youtube/v3";
 const UA = "GoatViews/1.0 (football scores site)";
-const FEED_UA = "Mozilla/5.0 (compatible; GoatViews/1.0; +https://goat-views.vercel.app)";
 const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", "de", "of"]);
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
@@ -24,7 +24,15 @@ function teamMatches(team: string, titleTokens: Set<string>) {
   return !!strong && titleTokens.has(strong);
 }
 
-const decode = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+async function yt(path: string, params: Record<string, string>, revalidate: number) {
+  const res = await fetch(API + path + "?" + new URLSearchParams(params).toString(), { next: { revalidate } });
+  if (!res.ok) {
+    let reason = "";
+    try { reason = String((await res.json())?.error?.message ?? "").slice(0, 140); } catch {}
+    throw new Error("YouTube " + path + " returned " + res.status + (reason ? ": " + reason : ""));
+  }
+  return res.json();
+}
 
 async function getJson(url: string, revalidate: number) {
   try {
@@ -36,84 +44,96 @@ async function getJson(url: string, revalidate: number) {
   }
 }
 
-type Upload = { id: string; title: string; thumbnail: string; date: string };
-
-function parseFeed(xml: string) {
-  const author = decode(/<author>\s*<name>([^<]*)<\/name>/i.exec(xml)?.[1] ?? "");
-  const entries: Upload[] = xml
-    .split("<entry>")
-    .slice(1)
-    .map((block) => ({
-      id: /<yt:videoId>([^<]+)<\/yt:videoId>/.exec(block)?.[1] ?? "",
-      title: decode(/<title>([^<]*)<\/title>/.exec(block)?.[1] ?? ""),
-      thumbnail: /<media:thumbnail url="([^"]+)"/.exec(block)?.[1] ?? "",
-      date: /<published>([^<]+)<\/published>/.exec(block)?.[1] ?? ""
-    }))
-    .filter((v) => v.id && v.title);
-  return { author, entries };
-}
-
-// finds the channel ID(s) from Wikipedia -> Wikidata, no key needed
-async function lookupIds(src: HighlightSource): Promise<{ qid: string; ids: string[]; note: string }> {
-  if (src.channelId) return { qid: "", ids: [src.channelId], note: "channel ID set by hand" };
-  const page = await getJson(
-    "https://en.wikipedia.org/w/api.php?action=query&prop=pageprops&ppprop=wikibase_item&redirects=1&format=json&titles=" + encodeURIComponent(src.wikipedia),
-    60 * 60 * 24 * 7
-  );
-  if (!page) return { qid: "", ids: [], note: "Wikipedia request failed" };
+// backup way to find a channel ID: Wikipedia -> Wikidata
+async function wikidataIds(title: string): Promise<string[]> {
+  const page = await getJson("https://en.wikipedia.org/w/api.php?action=query&prop=pageprops&ppprop=wikibase_item&redirects=1&format=json&titles=" + encodeURIComponent(title), 60 * 60 * 24 * 7);
   const first: any = Object.values(page?.query?.pages ?? {})[0];
-  const qid = first?.pageprops?.wikibase_item ?? "";
-  if (!qid) return { qid: "", ids: [], note: "Wikipedia page has no Wikidata link" };
+  const qid = first?.pageprops?.wikibase_item;
+  if (!qid) return [];
   const claims = await getJson("https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P2397&entity=" + qid, 60 * 60 * 24 * 7);
-  if (!claims) return { qid, ids: [], note: "Wikidata request failed" };
   const list: any[] = claims?.claims?.P2397 ?? [];
-  const rank = (c: any) => (c.rank === "preferred" ? 0 : c.rank === "normal" ? 1 : 2);
-  const ids = list
+  return list
     .filter((c) => c.rank !== "deprecated")
-    .sort((a, b) => rank(a) - rank(b))
     .map((c) => c?.mainsnak?.datavalue?.value)
     .filter((v) => typeof v === "string" && /^UC[\w-]{20,}$/.test(v)) as string[];
-  return { qid, ids, note: ids.length ? "ok" : "Wikidata has no YouTube channel ID for this page" };
 }
 
-async function tryFeeds(src: HighlightSource) {
-  const { qid, ids, note } = await lookupIds(src);
-  const tries: any[] = [];
-  for (const channelId of ids) {
-    // first the channel's video list, then its "uploads" list, which sometimes works when the first does not
-    const urls = [
-      { kind: "channel list", url: "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId },
-      { kind: "uploads list", url: "https://www.youtube.com/feeds/videos.xml?playlist_id=UU" + channelId.slice(2) }
-    ];
-    for (const item of urls) {
-      try {
-        const res = await fetch(item.url, { headers: { "User-Agent": FEED_UA, Accept: "application/atom+xml, application/xml, text/xml, */*" }, next: { revalidate: 600 } });
-        if (!res.ok) { tries.push({ channelId, kind: item.kind, youtubeStatus: res.status }); continue; }
-        const parsed = parseFeed(await res.text());
-        const accepted = parsed.author.toLowerCase().includes(src.authorHint);
-        tries.push({ channelId, kind: item.kind, youtubeStatus: res.status, channelName: parsed.author, videos: parsed.entries.length, accepted });
-        if (accepted) return { wikipedia: src.wikipedia, qid, note, tries, found: { channelId, author: parsed.author, uploads: parsed.entries } };
-      } catch {
-        tries.push({ channelId, kind: item.kind, error: "request to YouTube failed" });
+type Resolved = { channelId: string; title: string; uploads: string };
+const resolvedCache = new Map<string, Resolved>();
+
+async function resolveChannel(src: HighlightSource, key: string, log: any[]): Promise<Resolved | null> {
+  const cacheKey = JSON.stringify(src);
+  const cached = resolvedCache.get(cacheKey);
+  if (cached) return cached;
+
+  const attempts: Record<string, string>[] = [];
+  if (src.channelId) attempts.push({ id: src.channelId });
+  if (src.handle) attempts.push({ forHandle: src.handle });
+  if (src.wikipedia) for (const id of await wikidataIds(src.wikipedia)) attempts.push({ id });
+
+  for (const attempt of attempts) {
+    try {
+      const json = await yt("/channels", { part: "snippet,contentDetails", key, ...attempt }, 60 * 60 * 24 * 7);
+      const item = json?.items?.[0];
+      const title = String(item?.snippet?.title ?? "");
+      const uploads = String(item?.contentDetails?.relatedPlaylists?.uploads ?? "");
+      const accepted = !!uploads && title.toLowerCase().includes(src.authorHint);
+      log.push({ tried: attempt, channelName: title || "(not found)", accepted });
+      if (accepted) {
+        const found = { channelId: String(item.id), title, uploads };
+        resolvedCache.set(cacheKey, found);
+        return found;
       }
+    } catch (error) {
+      log.push({ tried: attempt, error: error instanceof Error ? error.message : "failed" });
     }
   }
-  return { wikipedia: src.wikipedia, qid, note, tries, found: null as null | { channelId: string; author: string; uploads: Upload[] } };
+  return null;
+}
+
+type Upload = { id: string; title: string; thumbnail: string; date: string };
+
+async function latestUploads(playlistId: string, key: string): Promise<Upload[]> {
+  const out: any[] = [];
+  let pageToken = "";
+  for (let page = 0; page < 3; page++) {
+    const params: Record<string, string> = { part: "snippet", playlistId, maxResults: "50", key };
+    if (pageToken) params.pageToken = pageToken;
+    const json = await yt("/playlistItems", params, 600);
+    out.push(...(json.items ?? []));
+    pageToken = json.nextPageToken ?? "";
+    if (!pageToken) break;
+  }
+  return out
+    .map((item) => ({
+      id: String(item.snippet?.resourceId?.videoId ?? ""),
+      title: String(item.snippet?.title ?? ""),
+      thumbnail: String(item.snippet?.thumbnails?.medium?.url ?? item.snippet?.thumbnails?.default?.url ?? ""),
+      date: String(item.snippet?.publishedAt ?? "")
+    }))
+    .filter((v) => v.id && v.title && !/^(private|deleted) video$/i.test(v.title));
 }
 
 export async function GET(req: NextRequest) {
+  const key = process.env.YOUTUBE_API_KEY;
   const home = req.nextUrl.searchParams.get("home") ?? "";
   const away = req.nextUrl.searchParams.get("away") ?? "";
   const league = req.nextUrl.searchParams.get("league") ?? "";
   const debug = !!req.nextUrl.searchParams.get("debug");
   const sources = HIGHLIGHT_CHANNELS[league] ?? (debug ? HIGHLIGHT_CHANNELS["Premier League"] : []);
 
+  if (!key) return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
   // hidden when this league has no official channel set up
-  if (!sources.length) return NextResponse.json({ configured: false, videos: [], scope: "league" });
+  if (!sources.length) return NextResponse.json({ configured: false, keyFound: true, videos: [], scope: "league" });
 
   try {
-    const results = await Promise.all(sources.map((src) => tryFeeds(src)));
-    const uploads = results.flatMap((r) => r.found?.uploads ?? []);
+    const log: any[] = [];
+    const uploads: Upload[] = [];
+    for (const src of sources) {
+      const channel = await resolveChannel(src, key, log);
+      if (channel) uploads.push(...(await latestUploads(channel.uploads, key)));
+    }
+
     const highlightsOnly = uploads.filter((v) => HIGHLIGHT.test(v.title));
     const matchVideos = highlightsOnly.filter((v) => {
       const set = new Set(tokens(v.title));
@@ -122,17 +142,29 @@ export async function GET(req: NextRequest) {
 
     if (debug) {
       return NextResponse.json({
+        keyFound: true,
         league: league || "(none, testing Premier League)",
-        steps: results.map((r) => ({ wikipedia: r.wikipedia, wikidataId: r.qid, result: r.note, youtubeTries: r.tries })),
+        steps: log,
+        uploadsFetched: uploads.length,
         highlightVideos: highlightsOnly.length,
         foundForThisMatch: matchVideos.length,
-        sampleTitles: uploads.slice(0, 6).map((v) => v.title)
+        sampleTitles: highlightsOnly.slice(0, 5).map((v) => v.title)
       });
     }
 
     const scope = matchVideos.length ? "match" : "league";
-    const chosen = (matchVideos.length ? matchVideos : highlightsOnly).slice(0, 6);
-    const videos = chosen.map((v) => ({ title: v.title, src: "https://www.youtube.com/embed/" + v.id + "?rel=0", thumbnail: v.thumbnail, competition: league, date: v.date }));
+    const candidates = (matchVideos.length ? matchVideos : highlightsOnly).slice(0, 10);
+    if (!candidates.length) return NextResponse.json({ configured: true, videos: [], scope });
+
+    // keep only videos whose owner allows embedding
+    const status = await yt("/videos", { part: "status", id: candidates.map((v) => v.id).join(","), key }, 600);
+    const embeddable = new Set((status.items ?? []).filter((item: any) => item.status?.embeddable).map((item: any) => String(item.id)));
+
+    const videos = candidates
+      .filter((v) => embeddable.has(v.id))
+      .slice(0, 6)
+      .map((v) => ({ title: v.title, src: "https://www.youtube.com/embed/" + v.id + "?rel=0", thumbnail: v.thumbnail, competition: league, date: v.date }));
+
     return NextResponse.json({ configured: true, videos, scope });
   } catch (error) {
     return NextResponse.json({ configured: true, videos: [], scope: "league", error: error instanceof Error ? error.message : "Could not load highlights." });
