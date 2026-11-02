@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const UA = "GoatViews/1.0 (football scores site)";
+const FEED_UA = "Mozilla/5.0 (compatible; GoatViews/1.0; +https://goat-views.vercel.app)";
 const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", "de", "of"]);
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
@@ -79,15 +80,22 @@ async function tryFeeds(src: HighlightSource) {
   const { qid, ids, note } = await lookupIds(src);
   const tries: any[] = [];
   for (const channelId of ids) {
-    try {
-      const res = await fetch("https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId, { headers: { "User-Agent": UA }, next: { revalidate: 600 } });
-      if (!res.ok) { tries.push({ channelId, youtubeStatus: res.status }); continue; }
-      const parsed = parseFeed(await res.text());
-      const accepted = parsed.author.toLowerCase().includes(src.authorHint);
-      tries.push({ channelId, youtubeStatus: res.status, channelName: parsed.author, videos: parsed.entries.length, accepted });
-      if (accepted) return { wikipedia: src.wikipedia, qid, note, tries, found: { channelId, author: parsed.author, uploads: parsed.entries } };
-    } catch {
-      tries.push({ channelId, error: "request to YouTube failed" });
+    // first the channel's video list, then its "uploads" list, which sometimes works when the first does not
+    const urls = [
+      { kind: "channel list", url: "https://www.youtube.com/feeds/videos.xml?channel_id=" + channelId },
+      { kind: "uploads list", url: "https://www.youtube.com/feeds/videos.xml?playlist_id=UU" + channelId.slice(2) }
+    ];
+    for (const item of urls) {
+      try {
+        const res = await fetch(item.url, { headers: { "User-Agent": FEED_UA, Accept: "application/atom+xml, application/xml, text/xml, */*" }, next: { revalidate: 600 } });
+        if (!res.ok) { tries.push({ channelId, kind: item.kind, youtubeStatus: res.status }); continue; }
+        const parsed = parseFeed(await res.text());
+        const accepted = parsed.author.toLowerCase().includes(src.authorHint);
+        tries.push({ channelId, kind: item.kind, youtubeStatus: res.status, channelName: parsed.author, videos: parsed.entries.length, accepted });
+        if (accepted) return { wikipedia: src.wikipedia, qid, note, tries, found: { channelId, author: parsed.author, uploads: parsed.entries } };
+      } catch {
+        tries.push({ channelId, kind: item.kind, error: "request to YouTube failed" });
+      }
     }
   }
   return { wikipedia: src.wikipedia, qid, note, tries, found: null as null | { channelId: string; author: string; uploads: Upload[] } };
