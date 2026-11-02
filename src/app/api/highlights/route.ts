@@ -6,16 +6,18 @@ export const maxDuration = 30;
 
 const API = "https://www.googleapis.com/youtube/v3";
 const UA = "GoatViews/1.0 (football scores site)";
+const DAY = 24 * 60 * 60 * 1000;
 const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", "de", "of"]);
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
 const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments/i;
 const THROWBACK = /classic|throwback|relive|on this day|best of|history|rewind|years ago/i;
-const THREE_WEEKS = 21 * 24 * 60 * 60 * 1000;
+const ROUND = /matchweek|weekend|round|jornada|giornata|spieltag|journ[eé]e|goals/i;
 
 const tokens = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((t) => t.length >= 2 && !STOP.has(t));
 
+// strict: the team's full name (or its clear core) is in the title
 function teamMatches(team: string, titleTokens: Set<string>) {
   const t = tokens(team);
   if (!t.length) return false;
@@ -25,6 +27,13 @@ function teamMatches(team: string, titleTokens: Set<string>) {
   const strong = t.filter((x) => x.length >= 5 && !AMBIGUOUS.has(x)).sort((a, b) => b.length - a.length)[0];
   return !!strong && titleTokens.has(strong);
 }
+
+// loose: one distinctive word of the team name is in the title (for names like "Racing Santander" vs "R. RACING CLUB")
+function teamLoose(team: string, titleTokens: Set<string>) {
+  return tokens(team).filter((x) => x.length >= 5 && !AMBIGUOUS.has(x) && !GENERIC.has(x)).some((x) => titleTokens.has(x));
+}
+
+const either = (team: string, set: Set<string>) => teamMatches(team, set) || teamLoose(team, set);
 
 async function yt(path: string, params: Record<string, string>, revalidate: number) {
   const res = await fetch(API + path + "?" + new URLSearchParams(params).toString(), { next: { revalidate } });
@@ -121,6 +130,8 @@ export async function GET(req: NextRequest) {
   const home = req.nextUrl.searchParams.get("home") ?? "";
   const away = req.nextUrl.searchParams.get("away") ?? "";
   const league = req.nextUrl.searchParams.get("league") ?? "";
+  const kickoff = Date.parse(req.nextUrl.searchParams.get("date") ?? "");
+  const hasDate = Number.isFinite(kickoff);
   const debug = !!req.nextUrl.searchParams.get("debug");
   const country = (req.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
   const sources = HIGHLIGHT_CHANNELS[league] ?? (debug ? HIGHLIGHT_CHANNELS["Premier League"] : []);
@@ -139,31 +150,47 @@ export async function GET(req: NextRequest) {
 
     const highlightsOnly = uploads.filter((v) => HIGHLIGHT.test(v.title) && !THROWBACK.test(v.title));
     const now = Date.now();
-    const matchVideos = highlightsOnly.filter((v) => {
+
+    // videos published shortly after this match (or, with no date, in the last three weeks)
+    const within = (v: Upload, before: number, after: number) => {
       const published = Date.parse(v.date);
-      if (!Number.isFinite(published) || now - published > THREE_WEEKS) return false; // too old to be this match
-      const set = new Set(tokens(v.title));
-      return teamMatches(home, set) && teamMatches(away, set);
-    });
+      if (!Number.isFinite(published)) return false;
+      return hasDate ? published >= kickoff - before && published <= kickoff + after : published <= now && now - published <= 21 * DAY;
+    };
+    const setOf = (v: Upload) => new Set(tokens(v.title));
+
+    const poolWide = highlightsOnly.filter((v) => within(v, 0.25 * DAY, 7 * DAY));
+    const poolNarrow = highlightsOnly.filter((v) => within(v, 0.25 * DAY, 4 * DAY));
+
+    let matchVideos = poolWide.filter((v) => teamMatches(home, setOf(v)) && teamMatches(away, setOf(v)));
+    if (!matchVideos.length) matchVideos = poolWide.filter((v) => either(home, setOf(v)) && either(away, setOf(v)));
+    if (!matchVideos.length && hasDate) matchVideos = poolNarrow.filter((v) => either(home, setOf(v)) || either(away, setOf(v)));
+    const roundVideos = hasDate ? poolNarrow.filter((v) => ROUND.test(v.title)) : [];
 
     if (debug) {
       return NextResponse.json({
         keyFound: true,
         visitorCountry: country || "(unknown)",
         league: league || "(none, testing Premier League)",
+        usedMatchDate: hasDate,
         steps: log,
         uploadsFetched: uploads.length,
         highlightVideos: highlightsOnly.length,
         foundForThisMatch: matchVideos.length,
+        matchdayVideos: roundVideos.length,
         sampleTitles: highlightsOnly.slice(0, 5).map((v) => v.title)
       });
     }
 
-    const scope = matchVideos.length ? "match" : "league";
-    const candidates = (matchVideos.length ? matchVideos : highlightsOnly).slice(0, 14);
+    let scope: "match" | "round" | "league" = "match";
+    let candidates = matchVideos;
+    if (!candidates.length && roundVideos.length) { scope = "round"; candidates = roundVideos; }
+    // without a match date we can only show the league's latest videos; with a date we show nothing unrelated
+    if (!candidates.length && !hasDate) { scope = "league"; candidates = highlightsOnly.filter((v) => within(v, 0, 0)).slice(0, 6); }
+    candidates = candidates.slice(0, 14);
     if (!candidates.length) return NextResponse.json({ configured: true, videos: [], scope });
 
-    // keep only videos that are public, embeddable and not blocked in the visitor's country
+    // keep only videos that are public, embeddable and not listed as blocked in the visitor's country
     const status = await yt("/videos", { part: "status,contentDetails", id: candidates.map((v) => v.id).join(","), key }, 600);
     const usable = new Set<string>();
     for (const item of status.items ?? []) {
