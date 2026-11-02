@@ -10,6 +10,8 @@ const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", 
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
 const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments/i;
+const THROWBACK = /classic|throwback|relive|on this day|best of|history|rewind|years ago/i;
+const THREE_WEEKS = 21 * 24 * 60 * 60 * 1000;
 
 const tokens = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((t) => t.length >= 2 && !STOP.has(t));
@@ -134,8 +136,11 @@ export async function GET(req: NextRequest) {
       if (channel) uploads.push(...(await latestUploads(channel.uploads, key)));
     }
 
-    const highlightsOnly = uploads.filter((v) => HIGHLIGHT.test(v.title));
+    const highlightsOnly = uploads.filter((v) => HIGHLIGHT.test(v.title) && !THROWBACK.test(v.title));
+    const now = Date.now();
     const matchVideos = highlightsOnly.filter((v) => {
+      const published = Date.parse(v.date);
+      if (!Number.isFinite(published) || now - published > THREE_WEEKS) return false; // too old to be this match
       const set = new Set(tokens(v.title));
       return teamMatches(home, set) && teamMatches(away, set);
     });
