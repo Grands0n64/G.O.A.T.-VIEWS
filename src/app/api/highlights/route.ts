@@ -45,27 +45,34 @@ export async function GET(req: NextRequest) {
   if (!apiKey) {
     return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
   }
-  if (sport !== "football" && sport !== "basketball") {
-    return NextResponse.json({ configured: true, videos: [], scope: "league", error: "Unsupported sport." }, { status: 400 });
+  if (sport !== "football") {
+    return NextResponse.json({
+      configured: true, videos: [], scope: "league",
+      error: "This highlights route is currently configured for the football API."
+    }, { status: 400 });
   }
-
-  const baseUrl = sport === "basketball"
-    ? "https://basketball.highlightly.net"
-    : "https://soccer.highlightly.net";
 
   const params = new URLSearchParams();
   if (league) params.set("leagueName", league);
-  if (date && /^\d{4}-\d{2}-\d{2}/.test(date)) params.set("date", date.slice(0, 10));
+
+  // A date belongs to a specific fixture. Do not let a match-centre date
+  // accidentally turn the competition-wide "Latest highlights" feed into
+  // a single-day search.
+  if (home && away && date && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    params.set("date", date.slice(0, 10));
+  }
   if (home) params.set("homeTeamName", home);
   if (away) params.set("awayTeamName", away);
+  params.set("timezone", "Europe/London");
   params.set("limit", "40");
+  params.set("offset", "0");
 
-  if (!league && !date && !home && !away) {
+  if (!league && !(home && away)) {
     return NextResponse.json({ configured: true, videos: [], scope: "league" });
   }
 
   try {
-    const response = await fetch(baseUrl + "/highlights?" + params.toString(), {
+    const response = await fetch("https://soccer.highlightly.net/highlights?" + params.toString(), {
       headers: { "x-rapidapi-key": apiKey, Accept: "application/json" },
       next: { revalidate: 60 }
     });
@@ -73,24 +80,26 @@ export async function GET(req: NextRequest) {
     if (!response.ok) {
       const detail = (await response.text()).slice(0, 300);
       return NextResponse.json({
-        configured: true,
-        videos: [],
-        scope: "league",
+        configured: true, videos: [], scope: "league",
         error: "Highlightly returned " + response.status + (detail ? ": " + detail : "")
       }, { status: 502 });
     }
 
     const payload = await response.json();
-    const items: HighlightlyItem[] = Array.isArray(payload?.data) ? payload.data : [];
+    const items: HighlightlyItem[] = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload) ? payload : [];
     const homeKey = normalize(home);
     const awayKey = normalize(away);
 
-    const mapped = items
-      .filter((item) => item.type === "VERIFIED")
+    // Only use clips Highlightly has verified and supplied with an HTTPS
+    // embed URL. A normal source URL is not an in-page player URL.
+    const embedded = items
+      .filter((item) => (item.type ?? "").toUpperCase() === "VERIFIED")
       .map((item) => ({ item, embedUrl: safeEmbedUrl(item.embedUrl) }))
       .filter((entry): entry is { item: HighlightlyItem; embedUrl: string } => !!entry.embedUrl);
 
-    const exact = mapped.filter(({ item }) => {
+    const exact = embedded.filter(({ item }) => {
       const matchHome = normalize(item.match?.homeTeam?.name ?? "");
       const matchAway = normalize(item.match?.awayTeam?.name ?? "");
       if (!homeKey || !awayKey || !matchHome || !matchAway) return false;
@@ -98,7 +107,7 @@ export async function GET(req: NextRequest) {
         (matchAway.includes(awayKey) || awayKey.includes(matchAway));
     });
 
-    const selected = (exact.length ? exact : mapped).slice(0, 8);
+    const selected = (home && away && exact.length ? exact : embedded).slice(0, 8);
     const videos = selected.map(({ item, embedUrl }) => ({
       id: String(item.id ?? embedUrl),
       title: item.title ?? "Official sports highlight",
@@ -109,21 +118,24 @@ export async function GET(req: NextRequest) {
       source: item.source,
       channel: item.channel,
       category: item.category,
-      verified: item.type === "VERIFIED"
+      verified: true
     }));
 
     return NextResponse.json({
       configured: true,
       videos,
-      scope: exact.length ? "match" : "league",
+      scope: home && away && exact.length ? "match" : "league",
       provider: "Highlightly",
+      diagnostics: {
+        received: items.length,
+        verified: items.filter((item) => (item.type ?? "").toUpperCase() === "VERIFIED").length,
+        withEmbedUrl: embedded.length
+      },
       plan: payload?.plan ?? null
     });
   } catch (error) {
     return NextResponse.json({
-      configured: true,
-      videos: [],
-      scope: "league",
+      configured: true, videos: [], scope: "league",
       error: error instanceof Error ? error.message : "Could not load Highlightly videos."
     }, { status: 502 });
   }
