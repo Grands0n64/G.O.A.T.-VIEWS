@@ -10,7 +10,7 @@ const DAY = 24 * 60 * 60 * 1000;
 const STOP = new Set(["fc", "cf", "afc", "sc", "ac", "fk", "sk", "club", "the", "de", "of"]);
 const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wanderers", "rovers", "county"]);
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
-const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments|goals/i;
+const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments|goals?|every goal|top goals|match recap/i;
 const THROWBACK = /classic|throwback|relive|on this day|best of|history|rewind|years ago/i;
 const ROUND = /matchweek|weekend|round|jornada|giornata|spieltag|journ[eé]e|goals/i;
 
@@ -186,8 +186,14 @@ export async function GET(req: NextRequest) {
     let scope: "match" | "round" | "league" = "match";
     let candidates = matchVideos;
     if (!candidates.length && roundVideos.length) { scope = "round"; candidates = roundVideos; }
-    // without a match date we can only show the league's latest videos; with a date we show nothing unrelated
-    if (!candidates.length && !hasDate) { scope = "league"; candidates = highlightsOnly.filter((v) => within(v, 0, 0)).slice(0, 6); }
+    // If the exact fixture has no matching upload, still show recent official competition highlights.
+    // Tournament uploads do not always name both teams in the title.
+    if (!candidates.length) {
+      scope = "league";
+      candidates = highlightsOnly
+        .filter((v) => { const published = Date.parse(v.date); return Number.isFinite(published) && published <= now && now - published <= 21 * DAY; })
+        .slice(0, 14);
+    }
     candidates = candidates.slice(0, 14);
     if (!candidates.length) return NextResponse.json({ configured: true, videos: [], scope });
 
