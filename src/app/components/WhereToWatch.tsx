@@ -4,21 +4,12 @@ import { useEffect, useState } from "react";
 import { AFFILIATE, BROADCASTERS, COUNTRIES, type CountryCode } from "../broadcasters";
 import { LIVE_CHANNELS } from "../liveChannels";
 
-function providerNames(broadcasts: any): string[] {
-  const out = new Set<string>();
-  for (const b of Array.isArray(broadcasts) ? broadcasts : []) {
-    const names: any[] = Array.isArray(b?.names) ? b.names : [b?.media?.shortName ?? b?.shortName ?? b?.name];
-    names.forEach((n) => { if (typeof n === "string" && n.trim()) out.add(n.trim()); });
-  }
-  return Array.from(out);
-}
-
 function guessFromLocale(): CountryCode {
   const region = (typeof navigator !== "undefined" ? navigator.language : "").split("-")[1]?.toUpperCase();
   return COUNTRIES.find((c) => c.code === region)?.code ?? "US";
 }
 
-export default function WhereToWatch({ league, broadcasts }: { league: string; broadcasts?: any }) {
+export default function WhereToWatch({ league }: { league: string; broadcasts?: any }) {
   const [country, setCountry] = useState<CountryCode>("US");
   const [playing, setPlaying] = useState<string | null>(null);
 
@@ -37,7 +28,6 @@ export default function WhereToWatch({ league, broadcasts }: { league: string; b
 
   const items = BROADCASTERS[league]?.[country] ?? [];
   const channels = LIVE_CHANNELS.filter((ch) => ch.leagues.includes(league) && (!ch.countries || ch.countries.includes(country)));
-  const listed = providerNames(broadcasts);
   const countryName = COUNTRIES.find((c) => c.code === country)?.name ?? "";
   const hasAffiliate = items.some((item) => AFFILIATE[item.name]);
 
@@ -81,9 +71,6 @@ export default function WhereToWatch({ league, broadcasts }: { league: string; b
       ))}
     </div> : channels.length === 0 && <p style={{ margin: "10px 0 0", fontSize: 11.5, color: "#91a0aa" }}>We don't have broadcaster details for {league} in {countryName} yet.</p>}
 
-    {listed.length > 0 && <p style={{ margin: "10px 0 0", fontSize: 11, color: "#91a0aa" }}>Listed by the data provider for this match: {listed.join(", ")}</p>}
-    <p style={{ margin: "8px 0 0", fontSize: 10, color: "#6f7f8b", lineHeight: 1.5 }}>
-      Broadcasters change each season, and not every match is shown on every service. Links go to the official services.{hasAffiliate ? " We may earn a commission if you sign up through these links." : ""}
-    </p>
+    {hasAffiliate && <p style={{ margin: "8px 0 0", fontSize: 10, color: "#6f7f8b", lineHeight: 1.5 }}>We may earn a commission if you sign up through these links.</p>}
   </section>;
 }
