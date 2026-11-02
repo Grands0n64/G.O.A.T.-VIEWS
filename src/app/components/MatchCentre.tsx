@@ -656,7 +656,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
           {busy && <p className="mc-loading">Loading match information…</p>}
           {error && <p className="mc-empty">{error} The scoreboard information is retained above.</p>}
           {tab === "Overview" && <>
-            <Highlights home={homeName} away={awayName} league={league} />
+            <Highlights home={homeName} away={awayName} league={league} date={competition?.date} />
             <section className="mc-section"><h3>Match summary</h3><p className="mc-analysis">{result}</p><div className="mc-info-grid"><div><small>Competition</small><b>{league}</b></div><div><small>Match status</small><b>{status}</b></div><div><small>Venue</small><b>{venue || "Not supplied"}</b></div><div><small>Referee</small><b>{safeText(competition?.officials?.[0]?.fullName ?? competition?.officials?.[0]?.displayName, "Not supplied")}</b></div></div></section>
             <section className="mc-section"><h3>Key events</h3><Timeline events={events} homeId={homeId} /></section>
             <section className="mc-section"><h3>Match statistics</h3><StatBars rows={statRows} limit={6} /></section>
