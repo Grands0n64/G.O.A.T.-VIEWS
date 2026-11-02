@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import WhereToWatch from "./WhereToWatch";
+import Highlights from "./Highlights";
 
 type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type RecordValue = Record<string, any>;
@@ -648,11 +650,13 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
           <div style={{ textAlign: "left" }}>{scorers.away.map((s, i) => <div key={i}>{scorerLine(s)}</div>)}</div>
         </div>}
         <div className="mc-venue">{[venue, competition?.venue?.address?.city].filter(Boolean).join(" · ")}{updated && isLive ? ` · Updated ${updated.toLocaleTimeString()}` : ""}</div></header>
+        <WhereToWatch league={league} broadcasts={competition?.broadcasts} />
         <nav className="mc-tabs" aria-label="Match sections">{tabs.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>)}</nav>
         <div className="mc-content">
           {busy && <p className="mc-loading">Loading match information…</p>}
           {error && <p className="mc-empty">{error} The scoreboard information is retained above.</p>}
           {tab === "Overview" && <>
+            <Highlights home={homeName} away={awayName} league={league} />
             <section className="mc-section"><h3>Match summary</h3><p className="mc-analysis">{result}</p><div className="mc-info-grid"><div><small>Competition</small><b>{league}</b></div><div><small>Match status</small><b>{status}</b></div><div><small>Venue</small><b>{venue || "Not supplied"}</b></div><div><small>Referee</small><b>{safeText(competition?.officials?.[0]?.fullName ?? competition?.officials?.[0]?.displayName, "Not supplied")}</b></div></div></section>
             <section className="mc-section"><h3>Key events</h3><Timeline events={events} homeId={homeId} /></section>
             <section className="mc-section"><h3>Match statistics</h3><StatBars rows={statRows} limit={6} /></section>
