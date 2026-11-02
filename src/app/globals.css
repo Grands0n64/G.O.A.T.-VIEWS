@@ -139,3 +139,9 @@
 .mc-fb.W{background:#2ecc71}
 .mc-fb.D{background:#f5c242}
 .mc-fb.L{background:#ff6b6b}
+
+/* Governing-body competition navigation */
+.governing-nav{display:flex;gap:9px;flex-wrap:wrap;margin:18px 0 12px;padding:10px;background:#101821;border:1px solid var(--line);border-radius:10px}
+.governing-btn{border:1px solid var(--line);background:#0b1219;color:#aab7c1;border-radius:8px;padding:10px 17px;font:700 12px 'DM Sans';cursor:pointer}
+.governing-btn.active{background:#26352b;border-color:#66864a;color:var(--green)}
+.governing-btn:hover{border-color:#66864a;color:#fff}
