@@ -122,6 +122,7 @@ export async function GET(req: NextRequest) {
   const away = req.nextUrl.searchParams.get("away") ?? "";
   const league = req.nextUrl.searchParams.get("league") ?? "";
   const debug = !!req.nextUrl.searchParams.get("debug");
+  const country = (req.headers.get("x-vercel-ip-country") ?? "").toUpperCase();
   const sources = HIGHLIGHT_CHANNELS[league] ?? (debug ? HIGHLIGHT_CHANNELS["Premier League"] : []);
 
   if (!key) return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
@@ -148,6 +149,7 @@ export async function GET(req: NextRequest) {
     if (debug) {
       return NextResponse.json({
         keyFound: true,
+        visitorCountry: country || "(unknown)",
         league: league || "(none, testing Premier League)",
         steps: log,
         uploadsFetched: uploads.length,
@@ -158,17 +160,25 @@ export async function GET(req: NextRequest) {
     }
 
     const scope = matchVideos.length ? "match" : "league";
-    const candidates = (matchVideos.length ? matchVideos : highlightsOnly).slice(0, 10);
+    const candidates = (matchVideos.length ? matchVideos : highlightsOnly).slice(0, 14);
     if (!candidates.length) return NextResponse.json({ configured: true, videos: [], scope });
 
-    // keep only videos whose owner allows embedding
-    const status = await yt("/videos", { part: "status", id: candidates.map((v) => v.id).join(","), key }, 600);
-    const embeddable = new Set((status.items ?? []).filter((item: any) => item.status?.embeddable).map((item: any) => String(item.id)));
+    // keep only videos that are public, embeddable and not blocked in the visitor's country
+    const status = await yt("/videos", { part: "status,contentDetails", id: candidates.map((v) => v.id).join(","), key }, 600);
+    const usable = new Set<string>();
+    for (const item of status.items ?? []) {
+      const restriction: any = item.contentDetails?.regionRestriction;
+      const blockedHere = !!country && (
+        (Array.isArray(restriction?.blocked) && restriction.blocked.includes(country)) ||
+        (Array.isArray(restriction?.allowed) && !restriction.allowed.includes(country))
+      );
+      if (item.status?.embeddable && item.status?.privacyStatus === "public" && !blockedHere) usable.add(String(item.id));
+    }
 
     const videos = candidates
-      .filter((v) => embeddable.has(v.id))
+      .filter((v) => usable.has(v.id))
       .slice(0, 6)
-      .map((v) => ({ title: v.title, src: "https://www.youtube.com/embed/" + v.id + "?rel=0", thumbnail: v.thumbnail, competition: league, date: v.date }));
+      .map((v) => ({ id: v.id, title: v.title, src: "https://www.youtube.com/embed/" + v.id + "?rel=0", thumbnail: v.thumbnail, competition: league, date: v.date }));
 
     return NextResponse.json({ configured: true, videos, scope });
   } catch (error) {
