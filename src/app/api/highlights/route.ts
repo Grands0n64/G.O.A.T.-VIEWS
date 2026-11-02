@@ -74,34 +74,25 @@ export async function GET(req: NextRequest) {
   common.set("offset", "0");
 
   try {
+    // Highlightly's highlights endpoint is most reliable when queried by
+    // its canonical league ID. Display names are not guaranteed to resolve.
     const leagueKey = normalize(league);
-    const names = leagueKey.includes("world cup") || leagueKey === "fifa"
-      ? ["World Cup", "FIFA World Cup", league]
-      : [league];
+    const leagueIds: Record<string, number> = {
+      "uefa champions league": 2486,
+      "champions league": 2486,
+      "fifa world cup": 1635,
+      "world cup": 1635,
+      "fifa world cup 2026": 1635
+    };
+    const leagueId = leagueIds[leagueKey];
+    const query = new URLSearchParams(common);
+    if (leagueId) query.set("leagueId", String(leagueId));
+    else query.set("leagueName", league);
 
-    let items: HighlightlyItem[] = [];
-    let plan: unknown = null;
-    let successfulQueries = 0;
-    const seenQueries = new Set<string>();
-
-    // Competition display labels and API league names do not always match.
-    // Try known World Cup naming variants instead of treating one empty
-    // response as proof that the tournament has no highlights.
-    for (const name of names) {
-      if (!name || seenQueries.has(normalize(name))) continue;
-      seenQueries.add(normalize(name));
-      const query = new URLSearchParams(common);
-      query.set("leagueName", name);
-      const result = await getHighlights(apiKey, query);
-      successfulQueries++;
-      if (!plan) plan = result.plan;
-      const keySet = new Set(items.map((item) => String(item.id)));
-      for (const item of result.items) {
-        const id = String(item.id ?? "");
-        if (!id || !keySet.has(id)) items.push(item);
-      }
-      if (result.items.length > 0) break;
-    }
+    const result = await getHighlights(apiKey, query);
+    const items = result.items;
+    const plan = result.plan;
+    const successfulQueries = 1;
 
     const homeKey = normalize(home);
     const awayKey = normalize(away);
