@@ -17,7 +17,7 @@ type HighlightlyItem = {
     date?: string;
     homeTeam?: { name?: string };
     awayTeam?: { name?: string };
-    league?: { name?: string };
+    league?: { id?: number; name?: string };
   };
 };
 
@@ -34,6 +34,22 @@ const safeEmbedUrl = (value: unknown): string | null => {
   }
 };
 
+async function getHighlights(apiKey: string, query: URLSearchParams) {
+  const response = await fetch("https://soccer.highlightly.net/highlights?" + query.toString(), {
+    headers: { "x-rapidapi-key": apiKey, Accept: "application/json" },
+    next: { revalidate: 60 }
+  });
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 200);
+    throw new Error("Highlightly returned " + response.status + (detail ? ": " + detail : ""));
+  }
+  const payload = await response.json();
+  return {
+    items: (Array.isArray(payload?.data) ? payload.data : Array.isArray(payload) ? payload : []) as HighlightlyItem[],
+    plan: payload?.plan ?? null
+  };
+}
+
 export async function GET(req: NextRequest) {
   const apiKey = process.env.HIGHLIGHTLY_API_KEY;
   const home = req.nextUrl.searchParams.get("home") ?? "";
@@ -42,58 +58,53 @@ export async function GET(req: NextRequest) {
   const date = req.nextUrl.searchParams.get("date") ?? "";
   const sport = (req.nextUrl.searchParams.get("sport") ?? "football").toLowerCase();
 
-  if (!apiKey) {
-    return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
-  }
+  if (!apiKey) return NextResponse.json({ configured: false, keyFound: false, videos: [], scope: "league" });
   if (sport !== "football") {
-    return NextResponse.json({
-      configured: true, videos: [], scope: "league",
-      error: "This highlights route is currently configured for the football API."
-    }, { status: 400 });
+    return NextResponse.json({ configured: true, videos: [], scope: "league", error: "This highlights route is currently configured for the football API." }, { status: 400 });
   }
 
-  const params = new URLSearchParams();
-  if (league) params.set("leagueName", league);
+  if (!league && !(home && away)) return NextResponse.json({ configured: true, videos: [], scope: "league" });
 
-  // A date belongs to a specific fixture. Do not let a match-centre date
-  // accidentally turn the competition-wide "Latest highlights" feed into
-  // a single-day search.
-  if (home && away && date && /^\d{4}-\d{2}-\d{2}/.test(date)) {
-    params.set("date", date.slice(0, 10));
-  }
-  if (home) params.set("homeTeamName", home);
-  if (away) params.set("awayTeamName", away);
-  params.set("timezone", "Europe/London");
-  params.set("limit", "40");
-  params.set("offset", "0");
-
-  if (!league && !(home && away)) {
-    return NextResponse.json({ configured: true, videos: [], scope: "league" });
-  }
+  const common = new URLSearchParams();
+  if (home && away && date && /^\d{4}-\d{2}-\d{2}/.test(date)) common.set("date", date.slice(0, 10));
+  if (home) common.set("homeTeamName", home);
+  if (away) common.set("awayTeamName", away);
+  common.set("timezone", "Europe/London");
+  common.set("limit", "40");
+  common.set("offset", "0");
 
   try {
-    const response = await fetch("https://soccer.highlightly.net/highlights?" + params.toString(), {
-      headers: { "x-rapidapi-key": apiKey, Accept: "application/json" },
-      next: { revalidate: 60 }
-    });
+    const leagueKey = normalize(league);
+    const names = leagueKey.includes("world cup") || leagueKey === "fifa"
+      ? ["World Cup", "FIFA World Cup", league]
+      : [league];
 
-    if (!response.ok) {
-      const detail = (await response.text()).slice(0, 300);
-      return NextResponse.json({
-        configured: true, videos: [], scope: "league",
-        error: "Highlightly returned " + response.status + (detail ? ": " + detail : "")
-      }, { status: 502 });
+    let items: HighlightlyItem[] = [];
+    let plan: unknown = null;
+    let successfulQueries = 0;
+    const seenQueries = new Set<string>();
+
+    // Competition display labels and API league names do not always match.
+    // Try known World Cup naming variants instead of treating one empty
+    // response as proof that the tournament has no highlights.
+    for (const name of names) {
+      if (!name || seenQueries.has(normalize(name))) continue;
+      seenQueries.add(normalize(name));
+      const query = new URLSearchParams(common);
+      query.set("leagueName", name);
+      const result = await getHighlights(apiKey, query);
+      successfulQueries++;
+      if (!plan) plan = result.plan;
+      const keySet = new Set(items.map((item) => String(item.id)));
+      for (const item of result.items) {
+        const id = String(item.id ?? "");
+        if (!id || !keySet.has(id)) items.push(item);
+      }
+      if (result.items.length > 0) break;
     }
 
-    const payload = await response.json();
-    const items: HighlightlyItem[] = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload) ? payload : [];
     const homeKey = normalize(home);
     const awayKey = normalize(away);
-
-    // Only use clips Highlightly has verified and supplied with an HTTPS
-    // embed URL. A normal source URL is not an in-page player URL.
     const embedded = items
       .filter((item) => (item.type ?? "").toUpperCase() === "VERIFIED")
       .map((item) => ({ item, embedUrl: safeEmbedUrl(item.embedUrl) }))
@@ -127,11 +138,13 @@ export async function GET(req: NextRequest) {
       scope: home && away && exact.length ? "match" : "league",
       provider: "Highlightly",
       diagnostics: {
+        queriesTried: successfulQueries,
         received: items.length,
         verified: items.filter((item) => (item.type ?? "").toUpperCase() === "VERIFIED").length,
-        withEmbedUrl: embedded.length
+        withEmbedUrl: embedded.length,
+        apiPlanMessage: (plan as { message?: string } | null)?.message ?? null
       },
-      plan: payload?.plan ?? null
+      plan
     });
   } catch (error) {
     return NextResponse.json({
