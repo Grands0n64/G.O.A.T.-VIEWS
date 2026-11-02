@@ -93,7 +93,7 @@ export default function Highlights({ home, away, league, date }: { home: string;
         const id = videoIdOf(video);
         return <div key={id} style={{ background: "#121d26", border: "1px solid #293640", borderRadius: 10, overflow: "hidden" }}>
           {failed.includes(id)
-            ? <div style={{ position: "relative", minHeight: 150, display: "grid", placeItems: "center", gap: 8, padding: 16, background: "#080d12", color: "#fff", textAlign: "center" }}><span>This video cannot be embedded here.</span><a href={"https://www.youtube.com/watch?v=" + id} target="_blank" rel="noreferrer" style={{ color: "#8fc7ff", textDecoration: "underline" }}>Watch on YouTube</a></div>
+            ? <div style={{ position: "relative", minHeight: 150, display: "grid", placeItems: "center", padding: 16, background: "#080d12", color: "#fff", textAlign: "center" }}><span>This publisher has blocked playback on external websites. This video is unavailable inside G.O.A.T. VIEWS.</span></div>
             : open === id
             ? <div style={{ position: "relative", paddingTop: "56.25%", background: "#000" }}>
               <Player
