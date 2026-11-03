@@ -10,7 +10,7 @@ function parse(xml:string):Story[]{return [...xml.matchAll(/<item(?:\s[^>]*)?>([
  let url="";try{const u=new URL(decode(link?.[1]||"").trim());if(u.protocol==="https:")url=u.toString();}catch{}
  const source=x.match(/<source[^>]*>([\s\S]*?)<\/source>/i);
  return {title:tag(x,"title"),url,description:tag(x,"description"),publishedAt:tag(x,"pubDate"),source:source?clean(source[1]):"Sports publisher"};
- }).filter(x=>x.title&&x.url&&!/^Google News$/i.test(x.title));}
+ }).filter(x=>x.title&&x.url&&!/^(Google News|Comprehensive up-to-date news coverage)$/i.test(x.title)&&!/^Google News$/i.test(x.source));}
 const queries:Record<string,string>={
  "All Sports":"latest sports news football basketball tennis cricket formula 1",
  "All Clubs":"football club news latest updates transfers injuries suspensions managers official announcements all teams worldwide",
