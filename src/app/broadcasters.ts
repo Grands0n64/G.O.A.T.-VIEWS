@@ -39,7 +39,15 @@ const SERVICES = {
   tubi: { name: "Tubi", url: "https://tubitv.com" },
   tv5: { name: "TV5MONDEplus", url: "https://www.tv5mondeplus.com" },
   zdf: { name: "ZDF", url: "https://www.zdf.de" },
-  apple: { name: "Apple TV", url: "https://tv.apple.com" }
+  apple: { name: "Apple TV", url: "https://tv.apple.com" },
+  thmanyah: { name: "Thmanyah", url: "https://thmanyah.com" },
+  fox: { name: "FOX Sports", url: "https://www.foxsports.com" },
+  bbc: { name: "BBC Sport / iPlayer", url: "https://www.bbc.co.uk/sport" },
+  itv: { name: "ITV / ITVX", url: "https://www.itv.com" },
+  tsn: { name: "TSN", url: "https://www.tsn.ca" },
+  newworld: { name: "New World TV", url: "https://newworldtv.com" },
+  sbstv: { name: "SBS Australia", url: "https://www.sbs.com.au" },
+  televisa: { name: "Televisa", url: "https://www.televisa.com" }
 } as const;
 
 type Key = keyof typeof SERVICES;
@@ -77,5 +85,43 @@ export const BROADCASTERS: Record<string, Table> = {
   "UEFA Champions League": {
     US: [s("paramount", "Check match listing"), s("cbs", "Selected matches")], GB: [s("tnt", "Check match listing"), s("prime", "Selected matches")], ES: [s("movistar")], DE: [s("dazn"), s("prime", "Selected match"), s("zdf", "Highlights only", true)], FR: [s("canalplus")], NG: [s("supersport", "Check DStv, GOtv or Showmax")]
   },
-  "MLS": apple
+  "MLS": apple,
+  "Saudi Pro League": {
+    SA: [s("thmanyah", "Official MENA rights holder")],
+    NG: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv", "SPL lists SportyTV for Nigeria"), s("startimes", "Check current match listing")],
+    GH: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv", "SPL lists SportyTV for Ghana")],
+    ZA: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv")],
+    US: [s("fox", "SPL international broadcast partner")],
+    MX: [s("fox", "SPL international broadcast partner")],
+    ES: [s("movistar")], FR: [s("dazn")], DE: [s("dazn")], AT: [s("dazn")], CH: [s("dazn")],
+    IN: [s("fandango", "SPL lists FanCode; official site link to be configured")],
+    JP: [s("disney", "SPL lists SPOTV; use SPOTV official listing")],
+    AU: [s("disney", "SPL lists Ten / Paramount+; check local schedule")],
+    AE: [s("thmanyah", "Official MENA rights holder")], QA: [s("thmanyah", "Official MENA rights holder")],
+    EG: [s("thmanyah", "Official MENA rights holder")], MA: [s("thmanyah", "Official MENA rights holder")]
+  },
+  "FIFA World Cup": {
+    NG: [s("newworld", "FIFA media-rights partner"), s("startimes", "FIFA media-rights partner"), s("supersport", "FIFA media-rights partner")],
+    US: [s("fox", "English coverage"), s("telemundo", "Spanish coverage")],
+    GB: [s("bbc", "Check BBC match schedule"), s("itv", "Check ITV match schedule")],
+    CA: [s("tsn", "Check match schedule")],
+    MX: [s("televisa", "Check local match schedule")],
+    AU: [s("sbstv", "Check SBS match schedule")],
+    SA: [s("bein", "FIFA rights vary by tournament and local schedule")],
+    AE: [s("bein", "FIFA rights vary by tournament and local schedule")],
+    QA: [s("bein", "FIFA rights vary by tournament and local schedule")],
+    EG: [s("bein", "FIFA rights vary by tournament and local schedule")],
+    MA: [s("bein", "FIFA rights vary by tournament and local schedule")]
+  },
+  "FIFA Club World Cup": {
+    US: [s("fox", "Check tournament schedule")],
+    NG: [s("newworld", "Check FIFA tournament schedule"), s("startimes"), s("supersport")],
+    GB: [s("bbc", "Check tournament schedule"), s("itv", "Check tournament schedule")]
+  },
+  "FIFA Women's World Cup": {
+    NG: [s("newworld", "Check tournament schedule"), s("startimes"), s("supersport")],
+    US: [s("fox", "Check tournament schedule")],
+    GB: [s("bbc", "Check tournament schedule"), s("itv", "Check tournament schedule")],
+    AU: [s("sbstv", "Check tournament schedule")]
+  },
 };
