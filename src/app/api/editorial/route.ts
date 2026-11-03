@@ -28,7 +28,7 @@ function parse(xml: string, source: Source) {
  return [...entries,...atom].map(item=>{
   const l=item.match(/<link(?:\s[^>]*?)?>([\s\S]*?)<\/link>/i)||item.match(/<link[^>]+href=["\']([^"\']+)["\']/i);
   let url=""; try { const u=new URL(decode(l?.[1]||"").trim(),source.url); if(u.protocol==="https:"||u.protocol==="http:")url=u.toString(); } catch {}
-  return { title:getTag(item,"title"), url, publishedAt:getTag(item,"pubDate")||getTag(item,"published")||getTag(item,"updated"), source:source.name };
+  return { title:getTag(item,"title"), url, publishedAt:getTag(item,"pubDate")||getTag(item,"published")||getTag(item,"updated"), source:getTag(item,"source")||source.name };
  }).filter(x=>x.title&&x.url);
 }
 const topicTerms: Record<string,string[]> = {
