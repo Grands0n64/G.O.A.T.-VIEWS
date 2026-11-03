@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Bell, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Search, Star, Trophy, Tv, RefreshCw } from "lucide-react";
+import { Activity, ArrowLeftRight, Bell, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Newspaper, Search, Star, Trophy, Tv, RefreshCw } from "lucide-react";
 import MatchCentre from "./components/MatchCentre";
 import MatchCentreErrorBoundary from "./components/MatchCentreErrorBoundary";
 import CompetitionStandings from "./components/CompetitionStandings";
