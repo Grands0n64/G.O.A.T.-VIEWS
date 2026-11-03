@@ -13,7 +13,7 @@ function parse(xml:string):Story[]{return [...xml.matchAll(/<item(?:\s[^>]*)?>([
  }).filter(x=>x.title&&x.url&&!/^Google News$/i.test(x.title));}
 const queries:Record<string,string>={
  "All Sports":"latest sports news football basketball tennis cricket formula 1",
- "All Clubs":"football club news latest updates transfers injuries managers Barcelona Real Madrid Manchester United Liverpool Arsenal Chelsea Bayern PSG Juventus",
+ "All Clubs":"football club news latest updates transfers injuries suspensions managers official announcements all teams worldwide",
  "Football":"football soccer news latest transfers clubs results injuries managers",
  "Basketball":"basketball NBA WNBA news latest",
  "Tennis":"tennis ATP WTA news latest",
@@ -57,7 +57,8 @@ async function fetchFeed(url:string){const r=await fetch(url,{headers:{"User-Age
 export async function GET(req:NextRequest){
  const type=req.nextUrl.searchParams.get("type")==="transfers"?"transfers":"news";
  const topic=req.nextUrl.searchParams.get("topic")||"All Sports";
- const query=type==="transfers"?(topic==="All Sports"||topic==="Football"?"football transfer news latest confirmed deals rumours":(queries[topic]||topic)+" football transfers"):queries[topic]||queries["All Sports"];
+ const custom=req.nextUrl.searchParams.get("q")?.trim().slice(0,100)||"";
+ const query=custom?(type==="transfers"?custom+" football transfer news confirmed deals rumours":custom+" football club sport news latest updates"):(type==="transfers"?(topic==="All Sports"||topic==="Football"?"football transfer news latest confirmed deals rumours":(queries[topic]||topic)+" football transfers"):queries[topic]||queries["All Sports"]);
  const googleUrl="https://news.google.com/rss/search?q="+encodeURIComponent(query+" when:7d")+"&hl=en-US&gl=US&ceid=US:en";
  const tasks=[fetchFeed(googleUrl),...(type==="news"&&(topic==="All Sports"||topic==="Football")?publishers.map(p=>fetchFeed(p.url)):[])];
  const results=await Promise.allSettled(tasks);
