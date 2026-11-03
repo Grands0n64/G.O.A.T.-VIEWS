@@ -28,7 +28,7 @@ function parse(xml: string, source: Source) {
  return [...entries,...atom].map(item=>{
   const l=item.match(/<link(?:\s[^>]*?)?>([\s\S]*?)<\/link>/i)||item.match(/<link[^>]+href=["\']([^"\']+)["\']/i);
   let url=""; try { const u=new URL(decode(l?.[1]||"").trim(),source.url); if(u.protocol==="https:"||u.protocol==="http:")url=u.toString(); } catch {}
-  const sourceMatch=item.match(/<source[^>]*>([\\s\\S]*?)<\\/source>/i);
+  const sourceMatch=item.match(/<source[^>]*>([\s\S]*?)<\/source>/i);
   const sourceName=sourceMatch?clean(sourceMatch[1]):source.name;
   const description=getTag(item,"description")||getTag(item,"summary")||getTag(item,"content:encoded");
   return { title:getTag(item,"title"), url, description, publishedAt:getTag(item,"pubDate")||getTag(item,"published")||getTag(item,"updated"), source:sourceName };
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
  const filtered=topic==="All"?all:all.filter(a=>(topicTerms[topic]||[]).some(term=>a.title.toLowerCase().includes(term)));
  const unique=new Map<string,typeof all[number]>(); for(const a of filtered)if(!unique.has(a.url))unique.set(a.url,a);
  const rawItems=[...unique.values()].sort((a,b)=>(Date.parse(b.publishedAt)||0)-(Date.parse(a.publishedAt)||0)).slice(0,60);
- const items=await Promise.all(rawItems.map(async item=>{
+ const items=await Promise.all(rawItems.filter(item=>!/^Google News$/i.test(item.title.trim())).map(async item=>{
   if(!new URL(item.url).hostname.endsWith("news.google.com"))return item;
   try{
    const resolved=await fetch(item.url,{redirect:"follow",headers:{"User-Agent":"Mozilla/5.0 (compatible; GOATViews/1.0)"},signal:AbortSignal.timeout(5000)});
