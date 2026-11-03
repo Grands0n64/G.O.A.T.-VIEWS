@@ -81,7 +81,7 @@ export const BROADCASTERS: Record<string, Table> = {
     US: [s("paramount", "Check match listing"), s("cbs", "Selected coverage")], GB: [s("dazn", "Check match listing"), s("tnt", "Selected matches")], ES: [s("dazn")], DE: [s("dazn")], FR: [s("dazn")], NG: [s("sportytv", "Check match listing")]
   },
   "Bundesliga": {
-    US: [s("fandango", "Check match listing"), s("usaNetwork", "Selected matches")], GB: [s("sky", "Check match listing")], ES: [s("dazn")], DE: [s("skyDe"), s("dazn")], FR: [s("bein")]
+    US: [s("espn", "Check current Bundesliga rights and match listing")], GB: [s("sky", "Check match listing")], ES: [s("dazn")], DE: [s("skyDe"), s("dazn")], FR: [s("bein")]
   },
   "Ligue 1": {
     US: [s("bein", "Check match listing"), s("tubi", "Check free match availability")], GB: [s("ligue1plus")], ES: [s("dazn"), s("tv5", "Check match listing")], DE: [s("dazn")], FR: [s("ligue1plus", "Check match listing")]
@@ -102,7 +102,12 @@ export const BROADCASTERS: Record<string, Table> = {
     JP: [s("spotv", "SPL lists SPOTV")],
     AU: [s("ten", "SPL lists Network 10 / Paramount+"), s("paramount", "Check local schedule")],
     AE: [s("thmanyah", "Official MENA rights holder")], QA: [s("thmanyah", "Official MENA rights holder")],
-    EG: [s("thmanyah", "Official MENA rights holder")], MA: [s("thmanyah", "Official MENA rights holder")]
+    EG: [s("thmanyah", "Official MENA rights holder")], MA: [s("thmanyah", "Official MENA rights holder")],
+    BH: [s("thmanyah", "Official MENA rights holder")], KW: [s("thmanyah", "Official MENA rights holder")],
+    OM: [s("thmanyah", "Official MENA rights holder")], JO: [s("thmanyah", "Official MENA rights holder")],
+    IQ: [s("thmanyah", "Official MENA rights holder")], DZ: [s("thmanyah", "Official MENA rights holder")],
+    TN: [s("thmanyah", "Official MENA rights holder")], LY: [s("thmanyah", "Official MENA rights holder")],
+    YE: [s("thmanyah", "Official MENA rights holder")], SD: [s("thmanyah", "Official MENA rights holder")]
   },
   "FIFA World Cup": {
     NG: [s("newworld", "FIFA media-rights partner"), s("startimes", "FIFA media-rights partner"), s("supersport", "FIFA media-rights partner")],
