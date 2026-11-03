@@ -3,7 +3,7 @@ export type HighlightSource = {
   wikipedia?: string;   // backup: Wikipedia page used to find the channel
   channelId?: string;   // a channel ID you are sure about
   query?: string;       // backup: search for the channel by name
-  authorHint: string;   // lowercase word the real channel name must contain
+  authorHint: string;   // lowercase words the real channel name must contain
 };
 
 const UEFA: HighlightSource[] = [{ handle: "UEFA", wikipedia: "UEFA", authorHint: "uefa" }];
@@ -13,7 +13,7 @@ export const HIGHLIGHT_CHANNELS: Record<string, HighlightSource[]> = {
   "Premier League": [{ channelId: "UCG5qGWdu8nIRZqJ_GgDwQ-w", handle: "PremierLeague", wikipedia: "Premier League", authorHint: "premier league" }],
   "LaLiga": [
     { handle: "LaLiga", wikipedia: "La Liga", authorHint: "laliga" },
-    { query: "LALIGA English", authorHint: "laliga" }
+    { query: "LALIGA TV", authorHint: "laliga tv" }
   ],
   "Serie A": [{ handle: "SerieA", wikipedia: "Serie A", authorHint: "serie a" }],
   "Bundesliga": [{ handle: "bundesliga", wikipedia: "Bundesliga", authorHint: "bundesliga" }],
