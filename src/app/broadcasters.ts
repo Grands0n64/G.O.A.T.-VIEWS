@@ -1,17 +1,19 @@
-export type CountryCode = string;
+export type CountryCode = "US" | "GB" | "ES" | "DE" | "FR" | "NG";
 
-const REGION_CODES = ["AD","AE","AF","AG","AI","AL","AM","AO","AQ","AR","AS","AT","AU","AW","AX","AZ","BA","BB","BD","BE","BF","BG","BH","BI","BJ","BL","BM","BN","BO","BQ","BR","BS","BT","BV","BW","BY","BZ","CA","CC","CD","CF","CG","CH","CI","CK","CL","CM","CN","CO","CR","CU","CV","CW","CX","CY","CZ","DE","DJ","DK","DM","DO","DZ","EC","EE","EG","EH","ER","ES","ET","FI","FJ","FK","FM","FO","FR","GA","GB","GD","GE","GF","GG","GH","GI","GL","GM","GN","GP","GQ","GR","GS","GT","GU","GW","GY","HK","HM","HN","HR","HT","HU","ID","IE","IL","IM","IN","IO","IQ","IR","IS","IT","JE","JM","JO","JP","KE","KG","KH","KI","KM","KN","KP","KR","KW","KY","KZ","LA","LB","LC","LI","LK","LR","LS","LT","LU","LV","LY","MA","MC","MD","ME","MF","MG","MH","MK","ML","MM","MN","MO","MP","MQ","MR","MS","MT","MU","MV","MW","MX","MY","MZ","NA","NC","NE","NF","NG","NI","NL","NO","NP","NR","NU","NZ","OM","PA","PE","PF","PG","PH","PK","PL","PM","PN","PR","PS","PT","PW","PY","QA","RE","RO","RS","RU","RW","SA","SB","SC","SD","SE","SG","SH","SI","SJ","SK","SL","SM","SN","SO","SR","SS","ST","SV","SX","SY","SZ","TC","TD","TF","TG","TH","TJ","TK","TL","TM","TN","TO","TR","TT","TV","TW","TZ","UA","UG","UM","US","UY","UZ","VA","VC","VE","VG","VI","VN","VU","WF","WS","YE","YT","ZA","ZM","ZW"];
-const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
-const flagFor = (code: string) => String.fromCodePoint(...[...code].map((char) => 127397 + char.charCodeAt(0)));
-
-// Full country selector. Vercel's edge country header supplies the initial visitor location.
-export const COUNTRIES: { code: CountryCode; name: string; flag: string }[] = REGION_CODES
-  .map((code) => ({ code, name: regionNames.of(code) ?? code, flag: flagFor(code) }))
-  .sort((a, b) => a.name.localeCompare(b.name));
+export const COUNTRIES: { code: CountryCode; name: string; flag: string }[] = [
+  { code: "NG", name: "Nigeria", flag: "🇳🇬" },
+  { code: "US", name: "USA", flag: "🇺🇸" },
+  { code: "GB", name: "UK", flag: "🇬🇧" },
+  { code: "ES", name: "Spain", flag: "🇪🇸" },
+  { code: "DE", name: "Germany", flag: "🇩🇪" },
+  { code: "FR", name: "France", flag: "🇫🇷" }
+];
 
 export type Where = { name: string; url: string; note?: string; free?: boolean };
 
-/* Add only affiliate URLs issued by the relevant broadcaster after approval. */
+/* Your affiliate links. When a service gives you one, paste it here, for example:
+   "DAZN": "https://your-affiliate-link-from-dazn",
+   The buttons will then use your link instead of the plain site. */
 export const AFFILIATE: Record<string, string> = {};
 
 const SERVICES = {
@@ -39,98 +41,76 @@ const SERVICES = {
   tubi: { name: "Tubi", url: "https://tubitv.com" },
   tv5: { name: "TV5MONDEplus", url: "https://www.tv5mondeplus.com" },
   zdf: { name: "ZDF", url: "https://www.zdf.de" },
-  apple: { name: "Apple TV", url: "https://tv.apple.com" },
-  thmanyah: { name: "Thmanyah", url: "https://thmanyah.com" },
-  fox: { name: "FOX Sports", url: "https://www.foxsports.com" },
-  bbc: { name: "BBC Sport / iPlayer", url: "https://www.bbc.co.uk/sport" },
-  itv: { name: "ITV / ITVX", url: "https://www.itv.com" },
-  tsn: { name: "TSN", url: "https://www.tsn.ca" },
-  newworld: { name: "New World TV", url: "https://newworldtv.com" },
-  sbstv: { name: "SBS Australia", url: "https://www.sbs.com.au" },
-  televisa: { name: "Televisa", url: "https://www.televisa.com" },
-  telemundo: { name: "Telemundo", url: "https://www.telemundo.com" },
-  fancode: { name: "FanCode", url: "https://www.fancode.com" },
-  spotv: { name: "SPOTV", url: "https://www.spotv.net" },
-  ten: { name: "Network 10", url: "https://10.com.au" }
+  apple: { name: "Apple TV", url: "https://tv.apple.com" }
 } as const;
 
 type Key = keyof typeof SERVICES;
 const s = (key: Key, note?: string, free?: boolean): Where => ({ name: SERVICES[key].name, url: SERVICES[key].url, note, free });
+
 type Table = Partial<Record<CountryCode, Where[]>>;
 
 const apple: Table = {
-  US: [s("apple", "Check the MLS schedule and local availability")],
-  GB: [s("apple", "Check local MLS availability")],
-  ES: [s("apple", "Check local MLS availability")],
-  DE: [s("apple", "Check local MLS availability")],
-  FR: [s("apple", "Check local MLS availability")],
-  NG: [s("apple", "Check local MLS availability")]
+  US: [s("apple", "All matches")], GB: [s("apple", "All matches")], ES: [s("apple", "All matches")],
+  DE: [s("apple", "All matches")], FR: [s("apple", "All matches")], NG: [s("apple", "All matches")]
 };
 
-// Country rights vary by season and match. These entries are the existing project mappings;
-// they must be verified against current rights before being represented as guaranteed coverage.
+// keys must match the league names in leagues.ts. Rights change every season: check them each August.
 export const BROADCASTERS: Record<string, Table> = {
   "Premier League": {
-    US: [s("peacock", "Check match listing; coverage varies"), s("usaNetwork", "Selected matches"), s("nbc", "Selected matches", true)],
-    GB: [s("sky", "Most live matches"), s("tnt", "Selected matches")], ES: [s("dazn")], DE: [s("skyDe")], FR: [s("canalplus")], NG: [s("supersport", "Check DStv or GOtv match listing")]
+    US: [s("peacock", "Every match, with NBC and USA Network"), s("usaNetwork", "Selected matches"), s("nbc", "Selected matches, free over the air", true)],
+    GB: [s("sky", "Most live matches"), s("tnt", "Selected matches, shown on HBO Max")],
+    ES: [s("dazn")],
+    DE: [s("skyDe")],
+    FR: [s("canalplus")],
+    NG: [s("supersport", "DStv: SuperSport Premier League (usually ch 223) or Football Plus (ch 222) · GOtv: SuperSport Football")]
   },
   "LaLiga": {
-    US: [s("espn", "Check match listing")], GB: [s("premier", "Check match listing"), s("disney", "Check match listing")], ES: [s("dazn"), s("movistar")], DE: [s("dazn")], FR: [s("bein")], NG: [s("supersport", "Check DStv or GOtv"), s("sportytv", "Check match listing"), s("startimes")]
+    US: [s("espn", "Every match on ESPN Select, selected matches on ESPN and ABC")],
+    GB: [s("premier", "Most matches"), s("disney", "One Saturday-night match a week")],
+    ES: [s("dazn"), s("movistar")],
+    DE: [s("dazn")],
+    FR: [s("bein")],
+    NG: [s("supersport", "Live on SuperSport channels via DStv or GOtv"), s("sportytv", "One match per round, free", true), s("startimes")]
   },
   "Serie A": {
-    US: [s("paramount", "Check match listing"), s("cbs", "Selected coverage")], GB: [s("dazn", "Check match listing"), s("tnt", "Selected matches")], ES: [s("dazn")], DE: [s("dazn")], FR: [s("dazn")], NG: [s("sportytv", "Check match listing")]
+    US: [s("paramount", "Every match"), s("cbs", "Selected matches on the free Golazo Network", true)],
+    GB: [s("dazn", "Most matches"), s("tnt", "Selected matches")],
+    ES: [s("dazn")],
+    DE: [s("dazn")],
+    FR: [s("dazn")],
+    NG: [s("sportytv", "One match per week, free", true)]
   },
   "Bundesliga": {
-    US: [s("espn", "Check current Bundesliga rights and match listing")], GB: [s("sky", "Check match listing")], ES: [s("dazn")], DE: [s("skyDe"), s("dazn")], FR: [s("bein")]
+    US: [s("fandango", "Most matches, free with ads", true), s("usaNetwork", "Marquee matches")],
+    GB: [s("sky", "Selected matches")],
+    ES: [s("dazn")],
+    DE: [s("skyDe"), s("dazn")],
+    FR: [s("bein")]
   },
   "Ligue 1": {
-    US: [s("bein", "Check match listing"), s("tubi", "Check free match availability")], GB: [s("ligue1plus")], ES: [s("dazn"), s("tv5", "Check match listing")], DE: [s("dazn")], FR: [s("ligue1plus", "Check match listing")]
+    US: [s("bein", "Several matches every round"), s("tubi", "Selected matches, free", true)],
+    GB: [s("ligue1plus")],
+    ES: [s("dazn"), s("tv5", "One match per round, free", true)],
+    DE: [s("dazn")],
+    FR: [s("ligue1plus", "Every match, also sold through DAZN")],
+    NG: [s("supersport", "Up to three matches a week, live on SuperSport")]
   },
   "UEFA Champions League": {
-    US: [s("paramount", "Check match listing"), s("cbs", "Selected matches")], GB: [s("tnt", "Check match listing"), s("prime", "Selected matches")], ES: [s("movistar")], DE: [s("dazn"), s("prime", "Selected match"), s("zdf", "Highlights only", true)], FR: [s("canalplus")], NG: [s("supersport", "Check DStv, GOtv or Showmax")]
+    NG: [s("supersport", "DStv: SuperSport Football Plus (usually ch 222) · GOtv: SuperSport Football (usually ch 61) · Streaming: DStv Stream or Showmax")],
+    US: [s("paramount", "Every match"), s("cbs", "Selected matches")],
+    GB: [s("tnt", "Selected matches, shown on HBO Max"), s("prime", "Selected matches")],
+    ES: [s("movistar")],
+    DE: [s("dazn"), s("prime", "One match per matchday"), s("zdf", "Highlights only", true)],
+    FR: [s("canalplus")]
   },
-  "MLS": apple,
-  "Saudi Pro League": {
-    SA: [s("thmanyah", "Official MENA rights holder")],
-    NG: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv", "SPL lists SportyTV for Nigeria"), s("startimes", "Check current match listing")],
-    GH: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv", "SPL lists SportyTV for Ghana")],
-    ZA: [s("espn", "SPL lists ESPN for Sub-Saharan Africa"), s("sportytv")],
-    US: [s("fox", "SPL international broadcast partner")],
-    MX: [s("fox", "SPL international broadcast partner")],
-    ES: [s("movistar")], FR: [s("dazn")], DE: [s("dazn")], AT: [s("dazn")], CH: [s("dazn")],
-    IN: [s("fancode", "SPL lists FanCode")],
-    JP: [s("spotv", "SPL lists SPOTV")],
-    AU: [s("ten", "SPL lists Network 10 / Paramount+"), s("paramount", "Check local schedule")],
-    AE: [s("thmanyah", "Official MENA rights holder")], QA: [s("thmanyah", "Official MENA rights holder")],
-    EG: [s("thmanyah", "Official MENA rights holder")], MA: [s("thmanyah", "Official MENA rights holder")],
-    BH: [s("thmanyah", "Official MENA rights holder")], KW: [s("thmanyah", "Official MENA rights holder")],
-    OM: [s("thmanyah", "Official MENA rights holder")], JO: [s("thmanyah", "Official MENA rights holder")],
-    IQ: [s("thmanyah", "Official MENA rights holder")], DZ: [s("thmanyah", "Official MENA rights holder")],
-    TN: [s("thmanyah", "Official MENA rights holder")], LY: [s("thmanyah", "Official MENA rights holder")],
-    YE: [s("thmanyah", "Official MENA rights holder")], SD: [s("thmanyah", "Official MENA rights holder")]
+  "UEFA Europa League": {
+    NG: [s("supersport", "Live on SuperSport channels via DStv or GOtv")]
   },
-  "FIFA World Cup": {
-    NG: [s("newworld", "FIFA media-rights partner"), s("startimes", "FIFA media-rights partner"), s("supersport", "FIFA media-rights partner")],
-    US: [s("fox", "English coverage"), s("telemundo", "Spanish coverage")],
-    GB: [s("bbc", "Check BBC match schedule"), s("itv", "Check ITV match schedule")],
-    CA: [s("tsn", "Check match schedule")],
-    MX: [s("televisa", "Check local match schedule")],
-    AU: [s("sbstv", "Check SBS match schedule")],
-    SA: [s("bein", "FIFA rights vary by tournament and local schedule")],
-    AE: [s("bein", "FIFA rights vary by tournament and local schedule")],
-    QA: [s("bein", "FIFA rights vary by tournament and local schedule")],
-    EG: [s("bein", "FIFA rights vary by tournament and local schedule")],
-    MA: [s("bein", "FIFA rights vary by tournament and local schedule")]
+  "UEFA Conference League": {
+    NG: [s("supersport", "Live on SuperSport channels via DStv or GOtv")]
   },
-  "FIFA Club World Cup": {
-    US: [s("fox", "Check tournament schedule")],
-    NG: [s("newworld", "Check FIFA tournament schedule"), s("startimes"), s("supersport")],
-    GB: [s("bbc", "Check tournament schedule"), s("itv", "Check tournament schedule")]
+  "UEFA Nations League": {
+    NG: [s("supersport", "Most important matches, live on SuperSport")]
   },
-  "FIFA Women's World Cup": {
-    NG: [s("newworld", "Check tournament schedule"), s("startimes"), s("supersport")],
-    US: [s("fox", "Check tournament schedule")],
-    GB: [s("bbc", "Check tournament schedule"), s("itv", "Check tournament schedule")],
-    AU: [s("sbstv", "Check tournament schedule")]
-  },
+  "MLS": apple
 };
