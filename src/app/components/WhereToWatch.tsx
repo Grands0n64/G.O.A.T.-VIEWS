@@ -48,7 +48,13 @@ export default function WhereToWatch({ league, home, away, live }: { league: str
     return () => { active = false; if (timer) clearTimeout(timer); };
   }, [league, home, away, live]);
 
-  const items = country ? (BROADCASTERS[league]?.[country] ?? []) : [];
+  const configuredItems = country ? (BROADCASTERS[league]?.[country] ?? []) : [];
+  const items = configuredItems.length ? configuredItems
+    : country && league === "Saudi Pro League"
+      ? [{ name: "Saudi Pro League · Official watch guide", url: "https://www.spl.com.sa/en/news/where-to-watch", note: "Check your territory and current match availability" }]
+      : country && league.startsWith("FIFA ")
+        ? [{ name: "FIFA · Official tournament information", url: "https://www.fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026", note: "Check your territory and the specific tournament" }]
+        : [];
   const available = streams.filter((s) => !failed.includes(s.id));
   const countryName = COUNTRIES.find((c) => c.code === country)?.name ?? country ?? "";
   const hasAffiliate = items.some((item) => AFFILIATE[item.name]);
