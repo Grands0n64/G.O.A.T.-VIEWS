@@ -22,7 +22,7 @@ const sportsFeeds: Feed[] = [
   { name: "The Athletic", url: "https://www.nytimes.com/athletic/rss/news/" }
 ];
 const terms: Record<string,string[]> = {
- "Football":["football","soccer"],"Basketball":["basketball","nba","wnba"],"Tennis":["tennis","atp","wta"],
+ "Football":["football","soccer"],"Football":["football","soccer","premier league","la liga","bundesliga","serie a","ligue 1"],"Basketball":["basketball","nba","wnba"],"Tennis":["tennis","atp","wta"],
  "Formula 1":["formula 1","formula one","f1","grand prix"],"Cricket":["cricket","ipl","t20"],
  "Premier League":["premier league","arsenal","chelsea","liverpool","manchester","tottenham","newcastle"],
  "La Liga":["la liga","real madrid","barcelona","atletico madrid"],"Bundesliga":["bundesliga","bayern","dortmund","leverkusen"],
