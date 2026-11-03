@@ -13,6 +13,7 @@ function parse(xml:string):Story[]{return [...xml.matchAll(/<item(?:\s[^>]*)?>([
  }).filter(x=>x.title&&x.url&&!/^Google News$/i.test(x.title));}
 const queries:Record<string,string>={
  "All Sports":"latest sports news football basketball tennis cricket formula 1",
+ "All Clubs":"football club news latest updates transfers injuries managers Barcelona Real Madrid Manchester United Liverpool Arsenal Chelsea Bayern PSG Juventus",
  "Football":"football soccer news latest transfers clubs results injuries managers",
  "Basketball":"basketball NBA WNBA news latest",
  "Tennis":"tennis ATP WTA news latest",
