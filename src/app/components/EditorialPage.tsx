@@ -1,6 +1,6 @@
 "use client";
 import {useCallback,useEffect,useState} from "react";
-import {ArrowLeft,ArrowUpRight,Clock3,Newspaper,ArrowLeftRight,RefreshCw,Search} from "lucide-react";
+import {ArrowUpRight,Clock3,Newspaper,ArrowLeftRight,RefreshCw,Search} from "lucide-react";
 type Item={title:string;url:string;publishedAt:string;source:string};
 export default function EditorialPage({type}:{type:"news"|"transfers"}){
  const transfer=type==="transfers";
