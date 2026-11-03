@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import WhereToWatch from "./WhereToWatch";
 import Highlights from "./Highlights";
-import ListenLive from "./ListenLive";
+import LiveCommentary from "./LiveCommentary";
 
 type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type RecordValue = Record<string, any>;
@@ -259,22 +259,6 @@ function Timeline({ events, homeId, order = "asc" }: { events: any[]; homeId: st
       <div><b>{eventLabel(event)}</b><p>{safeText(event.text ?? event.description ?? event.shortText, "")}</p>{detail !== "—" && <small>{detail}</small>}</div>
     </article>;
   })}</div>;
-}
-
-function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]; homeId: string }) {
-  if (!items.length) {
-    return <>
-      <p className="mc-muted">Minute-by-minute commentary is not published for this match. Showing key events instead.</p>
-      <Timeline events={fallback} homeId={homeId} order="desc" />
-    </>;
-  }
-  const sorted = [...items].sort((a, b) => num(b.sequence) - num(a.sequence));
-  return <div className="mc-comm">{sorted.map((item, i) => (
-    <div className="mc-comm-row" key={item.sequence ?? i}>
-      <time>{safeText(item.time?.displayValue ?? item.clock?.displayValue, "")}</time>
-      <p>{safeText(item.text ?? item.description, "")}</p>
-    </div>
-  ))}</div>;
 }
 
 /* ---------- SofaScore-style lineup ---------- */
@@ -625,6 +609,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
   }), [baseSides, photos, details, tally, data]);
 
   const commentary = asArray(data?.commentary);
+  const plays = asArray(data?.plays);
 
   const tabs: Tab[] = ["Overview", "Statistics", "Lineups", "Commentary", "Team form"];
   const numericHome = Number(homeScore), numericAway = Number(awayScore);
@@ -667,7 +652,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
             <section className="mc-section"><h3>Live player ratings</h3><PlayerRatings sides={sides} /></section>
           </>}
           {tab === "Lineups" && <section className="mc-section"><h3>Lineups & substitutes</h3><Lineups sides={sides} view={view} setView={setView} /></section>}
-          {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><ListenLive items={commentary.length ? commentary : events} live={isLive} /><Commentary items={commentary} fallback={events} homeId={homeId} /></section>}
+          {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><LiveCommentary commentary={commentary} plays={plays} keyEvents={events} homeId={homeId} homeName={homeName} awayName={awayName} live={isLive} /></section>}
           {tab === "Team form" && <section className="mc-section"><h3>Form & fixtures</h3><TeamForm schedules={teamSchedules} teams={[homeTeam, awayTeam]} /></section>}
         </div>
       </div>
