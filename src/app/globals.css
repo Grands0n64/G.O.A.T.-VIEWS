@@ -145,3 +145,20 @@
 .governing-btn{border:1px solid var(--line);background:#0b1219;color:#aab7c1;border-radius:8px;padding:10px 17px;font:700 12px 'DM Sans';cursor:pointer}
 .governing-btn.active{background:#26352b;border-color:#66864a;color:var(--green)}
 .governing-btn:hover{border-color:#66864a;color:#fff}
+
+
+/* Sports desk: transfer market and global headlines */
+.editorial-hub{margin-top:20px}
+.editorial-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px}
+.editorial-tabs button{display:inline-flex;align-items:center;gap:7px;padding:9px 13px;border:1px solid var(--line);border-radius:8px;background:#0b1219;color:#aab7c1;font:700 12px 'DM Sans';cursor:pointer}
+.editorial-tabs button.active{background:#26352b;border-color:#66864a;color:var(--green)}
+.editorial-note,.editorial-foot{font-size:11px;line-height:1.5;color:#8e9ca7}
+.editorial-list{display:grid;gap:0}
+.editorial-item{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.editorial-item h3{margin:5px 0 6px;font-size:14px;line-height:1.45;color:#e9eff3}
+.editorial-item time,.editorial-source{font-size:10px;color:#8d9ba6}
+.editorial-source{color:var(--green);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.editorial-item>a{display:inline-flex;align-items:center;gap:5px;flex-shrink:0;color:var(--green);font-size:11px;font-weight:700;text-decoration:none}
+.editorial-item>a:hover{text-decoration:underline}
+.editorial-foot{margin:12px 0 0}
+@media(max-width:560px){.editorial-item{align-items:flex-start;flex-direction:column;gap:8px}.editorial-item h3{font-size:13px}}
