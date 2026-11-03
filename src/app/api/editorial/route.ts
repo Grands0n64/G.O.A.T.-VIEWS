@@ -30,10 +30,10 @@ export async function GET(req: NextRequest) {
     });
     if (!response.ok) throw new Error("News source unavailable");
     const xml = await response.text();
-    const items = [...xml.matchAll(/<item(?:\\s[^>]*)?>([\\s\\S]*?)</item>/gi)].slice(0, 24).map((match) => {
+    const items = [...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/gi)].slice(0, 24).map((match) => {
       const item = match[1];
-      const linkMatch = item.match(/<link>([\\s\\S]*?)</link>/i);
-      const sourceMatch = item.match(/<source(?:\\s[^>]*)?>([\\s\\S]*?)</source>/i);
+      const linkMatch = item.match(/<link>([\\s\\S]*?)<\\/link>/i);
+      const sourceMatch = item.match(/<source(?:\\s[^>]*)?>([\\s\\S]*?)<\\/source>/i);
       return {
         title: tag(item, "title"),
         url: linkMatch ? decode(linkMatch[1].trim()) : "",
