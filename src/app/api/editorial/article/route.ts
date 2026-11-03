@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-const ALLOWED = ["bbc.com","bbc.co.uk","espn.com","skysports.com","theguardian.com","transfermarkt.com","goal.com","cbssports.com","formula1.com","nytimes.com"];
+const ALLOWED = ["bbc.com","bbc.co.uk","espn.com","skysports.com","theguardian.com","transfermarkt.com","goal.com","cbssports.com","formula1.com","nytimes.com","news.google.com"];
 function meta(html:string,key:string,attr="property"){
  const escaped=key.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
  const patterns=[new RegExp("<meta[^>]*"+attr+"=[\"']"+escaped+"[\"'][^>]*content=[\"']([^\"']*)[\"'][^>]*>","i"),new RegExp("<meta[^>]*content=[\"']([^\"']*)[\"'][^>]*"+attr+"=[\"']"+escaped+"[\"'][^>]*>","i")];
