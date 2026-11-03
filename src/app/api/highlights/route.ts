@@ -12,10 +12,12 @@ const GENERIC = new Set(["united", "city", "town", "albion", "hotspur", "wandere
 const AMBIGUOUS = new Set(["manchester", "madrid", "borussia", "athletic", "atletico", "sporting", "olympique", "paris", "united", "city", "real", "inter", "milan", "bayer", "bayern"]);
 const HIGHLIGHT = /highlight|resumen|resumo|summary|extended|all goals|best moments/i;
 const THROWBACK = /classic|throwback|relive|on this day|best of|history|rewind|years ago/i;
-const ROUND = /matchweek|weekend|round|jornada|giornata|spieltag|journ[eé]e|goals/i;
+const ROUND = /matchweek|matchday|weekend|round|jornada|giornata|spieltag|journ[eé]e|goals?\b/i;
 
 const tokens = (s: string) =>
   s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").split(" ").filter((t) => t.length >= 2 && !STOP.has(t));
+
+const decodeHtml = (s: string) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 
 // strict: the team's full name (or its clear core) is in the title
 function teamMatches(team: string, titleTokens: Set<string>) {
@@ -128,7 +130,7 @@ type Upload = { id: string; title: string; thumbnail: string; date: string };
 async function latestUploads(playlistId: string, key: string): Promise<Upload[]> {
   const out: any[] = [];
   let pageToken = "";
-  for (let page = 0; page < 3; page++) {
+  for (let page = 0; page < 5; page++) {
     const params: Record<string, string> = { part: "snippet", playlistId, maxResults: "50", key };
     if (pageToken) params.pageToken = pageToken;
     const json = await yt("/playlistItems", params, 600);
@@ -146,6 +148,35 @@ async function latestUploads(playlistId: string, key: string): Promise<Upload[]>
     .filter((v) => v.id && v.title && !/^(private|deleted) video$/i.test(v.title));
 }
 
+// for finished matches that are older than the channel's newest uploads: ask YouTube to search the channel
+let searchDay = "";
+let searchesToday = 0;
+function searchAllowed() {
+  const day = new Date().toISOString().slice(0, 10);
+  if (day !== searchDay) { searchDay = day; searchesToday = 0; }
+  if (searchesToday >= 40) return false;
+  searchesToday += 1;
+  return true;
+}
+
+async function searchOlder(channelId: string, home: string, away: string, kickoff: number, key: string): Promise<Upload[]> {
+  if (!searchAllowed()) return [];
+  const json = await yt("/search", {
+    part: "snippet", channelId, type: "video", order: "date", maxResults: "15", key,
+    q: home + " " + away,
+    publishedAfter: new Date(kickoff - 0.25 * DAY).toISOString(),
+    publishedBefore: new Date(kickoff + 8 * DAY).toISOString()
+  }, 60 * 60 * 24 * 7);
+  return (json.items ?? [])
+    .map((item: any) => ({
+      id: String(item.id?.videoId ?? ""),
+      title: decodeHtml(String(item.snippet?.title ?? "")),
+      thumbnail: String(item.snippet?.thumbnails?.medium?.url ?? item.snippet?.thumbnails?.default?.url ?? ""),
+      date: String(item.snippet?.publishedAt ?? "")
+    }))
+    .filter((v: Upload) => v.id && v.title);
+}
+
 // public, embeddable and not blocked in the visitor's country
 async function videoChecks(ids: string[], key: string, country: string) {
   if (!ids.length) return [];
@@ -159,7 +190,6 @@ async function videoChecks(ids: string[], key: string, country: string) {
     return {
       id: String(item.id),
       embeddable: !!item.status?.embeddable,
-      privacy: String(item.status?.privacyStatus ?? ""),
       blockedHere,
       usable: !!item.status?.embeddable && item.status?.privacyStatus === "public" && !blockedHere
     };
@@ -184,18 +214,24 @@ export async function GET(req: NextRequest) {
   try {
     const log: any[] = [];
     const raw: Upload[] = [];
+    const channelIds: string[] = [];
     for (const src of sources) {
       const channel = await resolveChannel(src, key, log);
-      if (channel) raw.push(...(await latestUploads(channel.uploads, key)));
+      if (channel) {
+        if (!channelIds.includes(channel.channelId)) channelIds.push(channel.channelId);
+        raw.push(...(await latestUploads(channel.uploads, key)));
+      }
     }
-    const seen = new Set<string>();
-    const uploads = raw.filter((v) => {
-      if (seen.has(v.id)) return false;
-      seen.add(v.id);
-      return true;
-    });
 
-    const highlightsOnly = uploads.filter((v) => HIGHLIGHT.test(v.title) && !THROWBACK.test(v.title));
+    const wantWomen = /women/i.test(league);
+    const clean = (list: Upload[]) => {
+      const seen = new Set<string>();
+      return list.filter((v) => {
+        if (seen.has(v.id)) return false;
+        seen.add(v.id);
+        return HIGHLIGHT.test(v.title) && !THROWBACK.test(v.title) && /women/i.test(v.title) === wantWomen;
+      });
+    };
     const now = Date.now();
 
     // videos published shortly after this match (or, with no date, in the last three weeks)
@@ -206,13 +242,26 @@ export async function GET(req: NextRequest) {
     };
     const setOf = (v: Upload) => new Set(tokens(v.title));
 
-    const poolWide = highlightsOnly.filter((v) => within(v, 0.25 * DAY, 7 * DAY));
-    const poolNarrow = highlightsOnly.filter((v) => within(v, 0.25 * DAY, 4 * DAY));
+    const findMatches = (list: Upload[]) => {
+      const wide = list.filter((v) => within(v, 0.25 * DAY, 8 * DAY));
+      const narrow = list.filter((v) => within(v, 0.25 * DAY, 4 * DAY));
+      let found = wide.filter((v) => teamMatches(home, setOf(v)) && teamMatches(away, setOf(v)));
+      if (!found.length) found = wide.filter((v) => either(home, setOf(v)) && either(away, setOf(v)));
+      if (!found.length && hasDate) found = narrow.filter((v) => either(home, setOf(v)) || either(away, setOf(v)));
+      return { found, round: hasDate ? narrow.filter((v) => ROUND.test(v.title)) : [] };
+    };
 
-    let matchVideos = poolWide.filter((v) => teamMatches(home, setOf(v)) && teamMatches(away, setOf(v)));
-    if (!matchVideos.length) matchVideos = poolWide.filter((v) => either(home, setOf(v)) && either(away, setOf(v)));
-    if (!matchVideos.length && hasDate) matchVideos = poolNarrow.filter((v) => either(home, setOf(v)) || either(away, setOf(v)));
-    const roundVideos = hasDate ? poolNarrow.filter((v) => ROUND.test(v.title)) : [];
+    let highlightsOnly = clean(raw);
+    let { found: matchVideos, round: roundVideos } = findMatches(highlightsOnly);
+    let usedSearch = false;
+
+    if (!matchVideos.length && hasDate && home && away && kickoff < now - 2 * DAY) {
+      const older: Upload[] = [];
+      for (const channelId of channelIds) older.push(...(await searchOlder(channelId, home, away, kickoff, key)));
+      usedSearch = true;
+      highlightsOnly = clean([...raw, ...older]);
+      ({ found: matchVideos, round: roundVideos } = findMatches(highlightsOnly));
+    }
 
     if (debug) {
       const sample = highlightsOnly.slice(0, 8);
@@ -221,12 +270,14 @@ export async function GET(req: NextRequest) {
         keyFound: true,
         visitorCountry: country || "(unknown)",
         league: league || "(none, testing Premier League)",
+        matchGiven: { home, away, date: hasDate ? new Date(kickoff).toISOString() : "(none)" },
         steps: log,
-        uploadsFetched: uploads.length,
+        uploadsFetched: raw.length,
         highlightVideos: highlightsOnly.length,
+        searchedOlderVideos: usedSearch,
         foundForThisMatch: matchVideos.length,
+        matchTitles: matchVideos.slice(0, 3).map((v) => v.title),
         matchdayVideos: roundVideos.length,
-        // shows if the channel's newest highlight videos can actually be played on your site
         embedCheck: sample.map((v) => {
           const c = checks.find((x: any) => x.id === v.id);
           return { title: v.title, canPlayHere: !!c?.usable, embeddable: c?.embeddable ?? null, blockedInYourCountry: c?.blockedHere ?? null };
