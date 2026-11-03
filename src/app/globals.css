@@ -191,3 +191,30 @@
 .editorial-story>a:hover{text-decoration:underline}
 .editorial-page .editorial-note,.editorial-page .editorial-foot{font-size:11px;line-height:1.6;color:#8796a1}
 @media(max-width:760px){.editorial-page .top{gap:14px;padding:0 4%}.editorial-page .top nav{display:none}.editorial-page .topright{display:flex}.editorial-hero{padding:36px 5% 28px}.editorial-content{padding:20px 5% 45px}.editorial-feed{grid-template-columns:1fr}.editorial-story{min-height:130px}}
+
+
+/* Standalone Transfer Market and Sports News pages */
+.editorial-page{max-width:1440px}
+.editorial-page .backhome{display:flex;align-items:center;gap:7px;color:#c8d2d9;text-decoration:none;font-size:12px;font-weight:700}
+.editorial-hero{padding:54px 7% 42px;background:radial-gradient(ellipse at 75% 30%,#253c32 0,#14231f 42%,#101821 100%);border-bottom:1px solid #293b35}
+.editorial-hero h1{font:700 clamp(34px,5vw,54px) 'Space Grotesk';margin:16px 0 8px}
+.editorial-hero>p{color:#b1beb8;font-size:14px;max-width:680px;line-height:1.65}
+.editorial-meta{display:flex;gap:22px;flex-wrap:wrap;margin-top:24px}
+.editorial-meta span{display:flex;align-items:center;gap:8px;color:#b5f34a;font-size:11px;font-weight:700}
+.editorial-meta svg{width:15px;height:15px}
+.editorial-main{padding:28px 7% 58px;min-height:55vh}
+.editorial-controls{display:grid;gap:16px;margin-bottom:18px}
+.editorial-topics{display:flex;gap:7px;flex-wrap:wrap}
+.editorial-topics button{border:1px solid var(--line);background:#101821;color:#aab7c1;border-radius:7px;padding:9px 12px;font:600 11px 'DM Sans';cursor:pointer}
+.editorial-topics button.active{background:#26352b;border-color:#66864a;color:var(--green)}
+.editorial-tools{display:flex;gap:10px;align-items:center}
+.editorial-tools label{display:flex;align-items:center;gap:9px;flex:1;max-width:560px;height:42px;padding:0 13px;background:#101821;border:1px solid var(--line);border-radius:8px;color:#81909e}
+.editorial-tools input{background:none;border:0;outline:0;color:white;width:100%;font:12px 'DM Sans'}
+.editorial-stories{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.editorial-stories article{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;min-height:150px;padding:18px;background:#101821;border:1px solid var(--line);border-radius:10px}
+.editorial-stories article small{color:var(--green);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px}
+.editorial-stories article h2{font:600 15px/1.5 'DM Sans';margin:8px 0 10px;color:#edf2f5}
+.editorial-stories article time{font-size:10px;color:#81909e}
+.editorial-stories article a{display:flex;align-items:center;gap:5px;white-space:nowrap;color:var(--green);font-size:10px;font-weight:800;text-decoration:none}
+.editorial-disclaimer{color:#8796a1;font-size:11px;line-height:1.6;margin:16px 0}
+@media(max-width:760px){.editorial-page .top{padding:0 4%;gap:15px}.editorial-page .top nav{display:none}.editorial-hero{padding:38px 5% 30px}.editorial-main{padding:22px 4% 42px}.editorial-stories{grid-template-columns:1fr}.editorial-stories article{min-height:unset}.editorial-tools label{max-width:none}}
