@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import WhereToWatch from "./WhereToWatch";
 import Highlights from "./Highlights";
+import ListenLive from "./ListenLive";
 
 type Props = { id: string; league: string; home: string; away: string; homeScore: number | null; awayScore: number | null; status: string; venue: string | null; onClose: () => void };
 type RecordValue = Record<string, any>;
@@ -261,39 +262,19 @@ function Timeline({ events, homeId, order = "asc" }: { events: any[]; homeId: st
 }
 
 function Commentary({ items, fallback, homeId }: { items: any[]; fallback: any[]; homeId: string }) {
+  if (!items.length) {
+    return <>
+      <p className="mc-muted">Minute-by-minute commentary is not published for this match. Showing key events instead.</p>
+      <Timeline events={fallback} homeId={homeId} order="desc" />
+    </>;
+  }
   const sorted = [...items].sort((a, b) => num(b.sequence) - num(a.sequence));
-  const lines = items.length
-    ? sorted.map((item) => [safeText(item.time?.displayValue ?? item.clock?.displayValue, ""), safeText(item.text ?? item.description, "")].filter(Boolean).join(". "))
-    : [...fallback].sort((a, b) => minuteValue(b) - minuteValue(a)).map((event) => [eventMinute(event), eventLabel(event), safeText(event.text ?? event.description ?? event.shortText, "")].filter(Boolean).join(". "));
-  const [speaking, setSpeaking] = useState(false);
-  const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
-  const listen = () => {
-    if (!canSpeak) return;
-    if (speaking) { window.speechSynthesis.cancel(); setSpeaking(false); return; }
-    const text = lines.filter(Boolean).join(". ");
-    if (!text) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1;
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    setSpeaking(true);
-    window.speechSynthesis.speak(utterance);
-  };
-  useEffect(() => () => { if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel(); }, []);
-  return <>
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12 }}>
-      <p className="mc-muted" style={{ margin: 0 }}>{items.length ? "Listen to the published match text." : "No live text feed is published. Audio can read the available key events."}</p>
-      <button type="button" onClick={listen} disabled={!canSpeak || !lines.length} aria-pressed={speaking} style={{ border: "1px solid #40515d", borderRadius: 8, padding: "8px 12px", background: speaking ? "#273d4b" : "#18232c", color: "#f2f6f8", cursor: "pointer", whiteSpace: "nowrap" }}>{speaking ? "■ Stop audio" : "▶ Listen"}</button>
+  return <div className="mc-comm">{sorted.map((item, i) => (
+    <div className="mc-comm-row" key={item.sequence ?? i}>
+      <time>{safeText(item.time?.displayValue ?? item.clock?.displayValue, "")}</time>
+      <p>{safeText(item.text ?? item.description, "")}</p>
     </div>
-    {!items.length && <p className="mc-muted">Minute-by-minute commentary is not published for this match. Showing key events instead.</p>}
-    {items.length ? <div className="mc-comm">{sorted.map((item, i) => (
-      <div className="mc-comm-row" key={item.sequence ?? i}>
-        <time>{safeText(item.time?.displayValue ?? item.clock?.displayValue, "")}</time>
-        <p>{safeText(item.text ?? item.description, "")}</p>
-      </div>
-    ))}</div> : <Timeline events={fallback} homeId={homeId} order="desc" />}
-  </>;
+  ))}</div>;
 }
 
 /* ---------- SofaScore-style lineup ---------- */
@@ -686,7 +667,7 @@ export default function MatchCentre({ id, league, home, away, homeScore: initial
             <section className="mc-section"><h3>Live player ratings</h3><PlayerRatings sides={sides} /></section>
           </>}
           {tab === "Lineups" && <section className="mc-section"><h3>Lineups & substitutes</h3><Lineups sides={sides} view={view} setView={setView} /></section>}
-          {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><Commentary items={commentary} fallback={events} homeId={homeId} /></section>}
+          {tab === "Commentary" && <section className="mc-section"><h3>Live commentary</h3><ListenLive items={commentary.length ? commentary : events} live={isLive} /><Commentary items={commentary} fallback={events} homeId={homeId} /></section>}
           {tab === "Team form" && <section className="mc-section"><h3>Form & fixtures</h3><TeamForm schedules={teamSchedules} teams={[homeTeam, awayTeam]} /></section>}
         </div>
       </div>
