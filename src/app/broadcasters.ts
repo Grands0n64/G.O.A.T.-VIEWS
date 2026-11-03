@@ -47,7 +47,11 @@ const SERVICES = {
   tsn: { name: "TSN", url: "https://www.tsn.ca" },
   newworld: { name: "New World TV", url: "https://newworldtv.com" },
   sbstv: { name: "SBS Australia", url: "https://www.sbs.com.au" },
-  televisa: { name: "Televisa", url: "https://www.televisa.com" }
+  televisa: { name: "Televisa", url: "https://www.televisa.com" },
+  telemundo: { name: "Telemundo", url: "https://www.telemundo.com" },
+  fancode: { name: "FanCode", url: "https://www.fancode.com" },
+  spotv: { name: "SPOTV", url: "https://www.spotv.net" },
+  ten: { name: "Network 10", url: "https://10.com.au" }
 } as const;
 
 type Key = keyof typeof SERVICES;
@@ -94,9 +98,9 @@ export const BROADCASTERS: Record<string, Table> = {
     US: [s("fox", "SPL international broadcast partner")],
     MX: [s("fox", "SPL international broadcast partner")],
     ES: [s("movistar")], FR: [s("dazn")], DE: [s("dazn")], AT: [s("dazn")], CH: [s("dazn")],
-    IN: [s("fandango", "SPL lists FanCode; official site link to be configured")],
-    JP: [s("disney", "SPL lists SPOTV; use SPOTV official listing")],
-    AU: [s("disney", "SPL lists Ten / Paramount+; check local schedule")],
+    IN: [s("fancode", "SPL lists FanCode")],
+    JP: [s("spotv", "SPL lists SPOTV")],
+    AU: [s("ten", "SPL lists Network 10 / Paramount+"), s("paramount", "Check local schedule")],
     AE: [s("thmanyah", "Official MENA rights holder")], QA: [s("thmanyah", "Official MENA rights holder")],
     EG: [s("thmanyah", "Official MENA rights holder")], MA: [s("thmanyah", "Official MENA rights holder")]
   },
