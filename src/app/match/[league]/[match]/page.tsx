@@ -11,7 +11,8 @@ export const revalidate = 60;
 type Params = { league: string; match: string };
 type Facts = {
   home: string; away: string; homeScore: number | null; awayScore: number | null;
-  status: string; state: string; venue: string | null; date: string | null;
+  status: string; statusName: string; state: string; venue: string | null; city: string | null; country: string | null;
+  date: string | null; logos: string[];
 };
 
 const SR_ONLY: CSSProperties = { position: "absolute", width: 1, height: 1, margin: -1, padding: 0, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 };
@@ -33,15 +34,20 @@ async function load(params: Params) {
     const away = competitors.find((c) => c.homeAway === "away") ?? competitors[1];
     if (!home || !away) return { league, id, facts: null as Facts | null };
     const toScore = (v: any) => (v === undefined || v === null || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
+    const logoOf = (c: any): string => String(c?.team?.logo ?? c?.team?.logos?.[0]?.href ?? "");
     const facts: Facts = {
       home: String(home.team?.displayName ?? home.team?.name ?? "Home"),
       away: String(away.team?.displayName ?? away.team?.name ?? "Away"),
       homeScore: toScore(home.score),
       awayScore: toScore(away.score),
       status: String(competition?.status?.type?.shortDetail ?? competition?.status?.type?.detail ?? ""),
+      statusName: String(competition?.status?.type?.name ?? ""),
       state: String(competition?.status?.type?.state ?? "pre"),
       venue: competition?.venue?.fullName ?? null,
-      date: competition?.date ?? null
+      city: competition?.venue?.address?.city ?? null,
+      country: competition?.venue?.address?.country ?? null,
+      date: competition?.date ?? null,
+      logos: [logoOf(home), logoOf(away)].filter((url) => /^https?:\/\//.test(url))
     };
     return { league, id, facts };
   } catch {
@@ -91,17 +97,45 @@ export default async function MatchPage({ params }: { params: Promise<Params> })
   }
 
   const finished = !!facts && facts.state === "post" && facts.homeScore !== null && facts.awayScore !== null;
-  const jsonLd = facts ? {
-    "@context": "https://schema.org",
-    "@type": "SportsEvent",
-    name: `${facts.home} vs ${facts.away}`,
-    sport: league.sport,
-    startDate: facts.date ?? undefined,
-    location: facts.venue ? { "@type": "Place", name: facts.venue } : undefined,
-    homeTeam: { "@type": "SportsTeam", name: facts.home },
-    awayTeam: { "@type": "SportsTeam", name: facts.away },
-    url: `${SITE_URL}/match/${slugify(league.league)}/${id}-${slugify(facts.home)}-vs-${slugify(facts.away)}`
-  } : null;
+
+  let jsonLd: Record<string, unknown> | null = null;
+  const startDate = facts?.date && !Number.isNaN(new Date(facts.date).getTime()) ? new Date(facts.date).toISOString() : undefined;
+  if (facts && startDate) {
+    const when = dateText(facts.date);
+    const description = finished
+      ? `${facts.home} ${facts.homeScore}-${facts.awayScore} ${facts.away} in the ${league.league}${when ? " on " + when : ""}.`
+      : `${facts.home} vs ${facts.away} in the ${league.league}${when ? " on " + when : ""}.`;
+    const place = facts.venue || facts.city || league.country;
+    const eventStatus = /postpone/i.test(facts.statusName)
+      ? "https://schema.org/EventPostponed"
+      : /cancel/i.test(facts.statusName)
+        ? "https://schema.org/EventCancelled"
+        : "https://schema.org/EventScheduled";
+    jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "SportsEvent",
+      name: `${facts.home} vs ${facts.away}`,
+      description,
+      sport: league.sport,
+      startDate,
+      eventStatus,
+      eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+      location: {
+        "@type": "Place",
+        name: place,
+        address: {
+          "@type": "PostalAddress",
+          addressLocality: facts.city ?? undefined,
+          addressCountry: facts.country ?? league.country
+        }
+      },
+      organizer: { "@type": "Organization", name: league.league },
+      homeTeam: { "@type": "SportsTeam", name: facts.home },
+      awayTeam: { "@type": "SportsTeam", name: facts.away },
+      image: facts.logos.length ? facts.logos : undefined,
+      url: `${SITE_URL}/match/${slugify(league.league)}/${id}-${slugify(facts.home)}-vs-${slugify(facts.away)}`
+    };
+  }
 
   return <>
     {jsonLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />}
