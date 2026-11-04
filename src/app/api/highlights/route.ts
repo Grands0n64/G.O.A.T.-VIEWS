@@ -165,7 +165,7 @@ async function searchOlder(channelId: string, home: string, away: string, kickof
     part: "snippet", channelId, type: "video", order: "date", maxResults: "15", key,
     q: home + " " + away,
     publishedAfter: new Date(kickoff - 0.25 * DAY).toISOString(),
-    publishedBefore: new Date(kickoff + 8 * DAY).toISOString()
+    publishedBefore: new Date(kickoff + 9 * DAY).toISOString()
   }, 60 * 60 * 24 * 7);
   return (json.items ?? [])
     .map((item: any) => ({
@@ -248,7 +248,14 @@ export async function GET(req: NextRequest) {
       let found = wide.filter((v) => teamMatches(home, setOf(v)) && teamMatches(away, setOf(v)));
       if (!found.length) found = wide.filter((v) => either(home, setOf(v)) && either(away, setOf(v)));
       if (!found.length && hasDate) found = narrow.filter((v) => either(home, setOf(v)) || either(away, setOf(v)));
-      return { found, round: hasDate ? narrow.filter((v) => ROUND.test(v.title)) : [] };
+      // matchday compilations: the ones published soonest after this match come first
+      const round = hasDate
+        ? list
+            .filter((v) => within(v, 0.25 * DAY, 9 * DAY) && ROUND.test(v.title))
+            .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+            .slice(0, 2)
+        : [];
+      return { found, round };
     };
 
     let highlightsOnly = clean(raw);
@@ -278,6 +285,7 @@ export async function GET(req: NextRequest) {
         foundForThisMatch: matchVideos.length,
         matchTitles: matchVideos.slice(0, 3).map((v) => v.title),
         matchdayVideos: roundVideos.length,
+        matchdayTitles: roundVideos.map((v) => ({ title: v.title, published: v.date })),
         embedCheck: sample.map((v) => {
           const c = checks.find((x: any) => x.id === v.id);
           return { title: v.title, canPlayHere: !!c?.usable, embeddable: c?.embeddable ?? null, blockedInYourCountry: c?.blockedHere ?? null };
