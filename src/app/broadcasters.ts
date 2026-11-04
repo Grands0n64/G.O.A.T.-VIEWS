@@ -56,7 +56,7 @@ const apple: Table = {
 
 // keys must match the league names in leagues.ts. Rights change every season: check them each August.
 export const BROADCASTERS: Record<string, Table> = {
-  "Premier League": {
+  "Saudi Pro League": {\n    NG: [s("espn", "ESPN Africa carried the 2025–26 season; check the current match schedule"), s("sportytv", "Saudi Pro League listed among SportyTV coverage partners; check match listing"), s("startimes", "Check the StarTimes live sports schedule")],\n    US: [s("espn", "Check current ESPN listings")],\n    GB: [s("dazn", "Check current DAZN listings")],\n    ES: [s("dazn", "Check current DAZN listings")],\n    DE: [s("dazn", "Check current DAZN listings")],\n    FR: [s("dazn", "Check current DAZN listings")]\n  },\n  "Premier League": {
     US: [s("peacock", "Every match, with NBC and USA Network"), s("usaNetwork", "Selected matches"), s("nbc", "Selected matches, free over the air", true)],
     GB: [s("sky", "Most live matches"), s("tnt", "Selected matches, shown on HBO Max")],
     ES: [s("dazn")],
