@@ -282,3 +282,13 @@
 .editorial-headline-link{color:inherit;text-decoration:none}
 .editorial-headline-link:hover{text-decoration:underline;text-decoration-color:#8cae72}
 @media(max-width:600px){.reader-top{height:58px;padding:0 16px}.reader-article{padding:36px 20px 70px}.reader-article h1{font-size:36px;letter-spacing:-.8px;margin-bottom:24px}.reader-figure{margin:0 -20px 20px}.reader-figure figcaption{margin:10px 20px;padding:8px 12px;font-size:12px}.reader-standfirst{font-size:18px}.reader-body{margin:28px auto}.reader-body p{font-size:17px;line-height:1.75}}
+
+.auth-page{min-height:100vh;background:#080d12;color:#eef4f1;display:grid;place-items:center;padding:28px 16px}
+.auth-logo{position:absolute;top:26px;left:28px;color:#f3f7f4;text-decoration:none;font-size:20px;font-weight:900}.auth-logo b{color:#80bd52}
+.auth-card{width:min(100%,440px);padding:34px;background:#111a20;border:1px solid #283832;border-radius:16px;box-shadow:0 24px 80px #0005}
+.auth-kicker{font-size:10px;letter-spacing:1.8px;color:#91c86a;font-weight:800}.auth-card h1{font-size:30px;margin:12px 0 8px}.auth-card>p{color:#9eaaa5;line-height:1.6;font-size:14px}
+.auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:24px 0}.auth-tabs button{border:1px solid #34433c;background:#18231e;color:#aebbb4;border-radius:8px;padding:12px;font-weight:700}.auth-tabs button.chosen{background:#294322;border-color:#83b95e;color:#fff}
+.auth-card form{display:grid;gap:16px}.auth-card form label{display:grid;gap:8px;color:#cbd5cf;font-size:13px;font-weight:700}.auth-card input{width:100%;padding:14px;border:1px solid #34443c;border-radius:8px;background:#0b1216;color:#fff;outline:none}.auth-card input:focus{border-color:#8abc63}
+.auth-submit{padding:14px;border:0;border-radius:8px;background:#83b95e;color:#10180e;font-weight:900;cursor:pointer}.auth-submit:disabled{opacity:.6}
+.auth-message{padding:12px;border-radius:8px;background:#1b2b23;color:#cce9b8;font-size:13px;line-height:1.5}.auth-back{display:inline-block;margin-top:20px;color:#a9b7ae;text-decoration:none;font-size:13px}
+@media(max-width:520px){.auth-card{padding:25px 20px}.auth-logo{top:16px;left:18px}}
