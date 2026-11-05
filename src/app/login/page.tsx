@@ -1,12 +1,35 @@
 "use client";
 import {useState} from "react";
 import Link from "next/link";
-import {createClient} from "@supabase/supabase-js";
-const url=process.env.NEXT_PUBLIC_SUPABASE_URL||"";
-const key=process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"";
-const supabase=url&&key?createClient(url,key):null;
+import {useRouter, useSearchParams} from "next/navigation";
+import {createClient} from "@/lib/supabase/client";
+
 export default function LoginPage(){
- const [mode,setMode]=useState<"signin"|"signup">("signup"),[email,setEmail]=useState(""),[password,setPassword]=useState(""),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
- async function submit(e:React.FormEvent){e.preventDefault();setMessage("");if(!supabase){setMessage("Account sign-in is not connected yet. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to the Vercel project environment variables.");return;}setBusy(true);try{const result=mode==="signup"?await supabase.auth.signUp({email,password}):await supabase.auth.signInWithPassword({email,password});if(result.error)throw result.error;setMessage(mode==="signup"?"Check your email to confirm your G.O.A.T. VIEWS account.":"You are signed in. You can return to G.O.A.T. VIEWS.");}catch(err){setMessage(err instanceof Error?err.message:"Unable to complete account request.");}finally{setBusy(false);}}
- return <main className="auth-page"><Link className="auth-logo" href="/">G.O.A.T. <b>VIEWS</b></Link><section className="auth-card"><span className="auth-kicker">YOUR SPORTS WORLD</span><h1>{mode==="signup"?"Create your account":"Welcome back"}</h1><p>Save matches, follow clubs and personalise your sports updates.</p><div className="auth-tabs"><button className={mode==="signup"?"chosen":""} onClick={()=>{setMode("signup");setMessage("");}}>Sign up</button><button className={mode==="signin"?"chosen":""} onClick={()=>{setMode("signin");setMessage("");}}>Sign in</button></div><form onSubmit={submit}><label>Email address<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label><label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters"/></label><button className="auth-submit" disabled={busy}>{busy?"Please wait…":mode==="signup"?"Create account":"Sign in"}</button></form>{message&&<p className="auth-message">{message}</p>}<Link className="auth-back" href="/">← Back to G.O.A.T. VIEWS</Link></section></main>;
+ const router=useRouter();
+ const search=useSearchParams();
+ const [mode,setMode]=useState<"signin"|"signup">("signin");
+ const [email,setEmail]=useState("");
+ const [password,setPassword]=useState("");
+ const [message,setMessage]=useState("");
+ const [busy,setBusy]=useState(false);
+ async function submit(e:React.FormEvent){
+  e.preventDefault();setMessage("");setBusy(true);
+  try{
+   const supabase=createClient();
+   if(mode==="signup"){
+    const {data,error}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin+"/auth/callback?next=/" }});
+    if(error)throw error;
+    if(data.session){router.replace("/");router.refresh();return;}
+    setMessage("Account created. Check your email to confirm your account, then sign in.");
+   }else{
+    const {error}=await supabase.auth.signInWithPassword({email,password});
+    if(error)throw error;
+    const next=search.get("next");
+    router.replace(next&&next.startsWith("/")&&!next.startsWith("//")?next:"/");
+    router.refresh();
+   }
+  }catch(err){setMessage(err instanceof Error?err.message:"Unable to complete account request.");}
+  finally{setBusy(false);}
+ }
+ return <main className="auth-page"><Link className="auth-logo" href="/">G.O.A.T. <b>VIEWS</b></Link><section className="auth-card"><span className="auth-kicker">YOUR SPORTS WORLD</span><h1>{mode==="signup"?"Create your account":"Welcome back"}</h1><p>Sign in to access G.O.A.T. VIEWS and your sports centre.</p><div className="auth-tabs"><button type="button" className={mode==="signup"?"chosen":""} onClick={()=>{setMode("signup");setMessage("");}}>Sign up</button><button type="button" className={mode==="signin"?"chosen":""} onClick={()=>{setMode("signin");setMessage("");}}>Sign in</button></div><form onSubmit={submit}><label>Email address<input type="email" required value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label><label>Password<input type="password" required minLength={8} value={password} onChange={e=>setPassword(e.target.value)} placeholder="At least 8 characters"/></label><button className="auth-submit" disabled={busy}>{busy?"Please wait…":mode==="signup"?"Create account":"Sign in"}</button></form>{message&&<p className="auth-message" role="status">{message}</p>}<Link className="auth-back" href="/">G.O.A.T. VIEWS</Link></section></main>;
 }
