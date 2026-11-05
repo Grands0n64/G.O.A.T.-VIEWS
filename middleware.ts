@@ -36,11 +36,13 @@ export async function middleware(request: NextRequest) {
     error,
   } = await supabase.auth.getUser();
 
-  // The login screen and Supabase email-confirmation callback are the only
-  // application routes visitors may access without an authenticated session.
+  // Login, auth callback, and legal/information pages are public.
+  // The sports homepage and all match/competition routes remain protected.
   const pathname = request.nextUrl.pathname;
   const isPublicRoute =
-    pathname === "/login" || pathname.startsWith("/auth/callback");
+    pathname === "/login" ||
+    pathname.startsWith("/auth/callback") ||
+    ["/about", "/privacy", "/terms", "/contact"].includes(pathname);
 
   if (error || !user) {
     if (!isPublicRoute) {
