@@ -11,7 +11,7 @@ export default function Privacy() {
   return <InfoPage title="Privacy Policy" updated={LAST_UPDATED}>
     <p>This policy explains what information {SITE_NAME} ("we", "us") handles when you use this website.</p>
     <Section title="Information we collect">
-      <p>You do not need an account to use {SITE_NAME}, and we do not ask you for your name or email address to view scores. Like any website, our hosting provider records technical information such as your IP address, browser type and the pages you visit in its server logs.</p>
+      <p>You must create an account or sign in to access the sports features of {SITE_NAME}. Our authentication service, Supabase, processes the information needed to create and secure your account, such as your email address and authentication session. Like any website, our hosting provider may also record technical information such as your IP address, browser type and the pages you visit in its server logs.</p>
       <p>We use your approximate country, worked out from your IP address, to show the broadcasters that apply where you are. We do not store it.</p>
     </Section>
     <Section title="Cookies and advertising">
