@@ -6,6 +6,7 @@ import { Activity, CalendarDays, ChevronRight, CircleDot, Flame, Menu, Search, S
 import CompetitionStandings from "./components/CompetitionStandings";
 import { LEAGUES } from "./leagues";
 import { matchPath } from "./slug";
+import { createClient } from "@/lib/supabase/client";
 
 type Match = {
  id:string; sport:string; league:string; country:string; home:string; away:string;
@@ -18,6 +19,8 @@ const leagueOrder=LEAGUES.map(l=>l.league);
 function localDate(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-");}
 export default function Home(){
  const router=useRouter();
+ const [signingOut,setSigningOut]=useState(false);
+ async function signOut(){setSigningOut(true);try{const supabase=createClient();const {error}=await supabase.auth.signOut();if(error)throw error;router.replace("/login");router.refresh();}catch(error){console.error("Sign out failed",error);setSigningOut(false);}}
  const [sport,setSport]=useState("Football"),[league,setLeague]=useState("All"),[search,setSearch]=useState(""),[liveOnly,setLiveOnly]=useState(false),[saved,setSaved]=useState<string[]>([]),[date,setDate]=useState(localDate),[feed,setFeed]=useState<Feed|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[lastUpdated,setLastUpdated]=useState("");
  const load=useCallback(async()=>{
   setLoading(true);setError("");
@@ -31,7 +34,7 @@ export default function Home(){
  const visible=useMemo(()=> (feed?.matches??[]).filter(g=>(league==="All"||g.league===league)&&(!liveOnly||g.live)&&(`${g.home} ${g.away} ${g.league}`.toLowerCase().includes(search.toLowerCase()))),[feed,league,liveOnly,search]);
  const today=date===localDate();
  const footerLink={color:"inherit",textDecoration:"none",marginRight:16} as const;
- return <main className="app"><header className="top"><a className="logo" href="#"><span className="logo-icon">G</span><span>G.O.A.T.<b> VIEWS</b><small>SEE THE GAME DIFFERENTLY</small></span></a><nav><a className="on" href="#scores">Scores</a><a href="#competitions">Competitions</a><a href="#stories">Stories</a></nav><div className="topright"><button className="round" aria-label="Refresh scores" onClick={()=>void load()}><RefreshCw size={17}/></button><Link className="signin" href="/login">Sign in</Link><button className="round mobile"><Menu/></button></div></header>
+ return <main className="app"><header className="top"><a className="logo" href="#"><span className="logo-icon">G</span><span>G.O.A.T.<b> VIEWS</b><small>SEE THE GAME DIFFERENTLY</small></span></a><nav><a className="on" href="#scores">Scores</a><a href="#competitions">Competitions</a><a href="#stories">Stories</a></nav><div className="topright"><button className="round" aria-label="Refresh scores" onClick={()=>void load()}><RefreshCw size={17}/></button><button className="signin" type="button" onClick={()=>void signOut()} disabled={signingOut}>{signingOut?"Signing out…":"Sign out"}</button><button className="round mobile"><Menu/></button></div></header>
  <div className="sportnav">{sports.map((s,i)=><button key={s} className={sport===s?"sport active":"sport"} onClick={()=>{setSport(s);setLeague("All");setLiveOnly(false);}}><span>{["⚽","🏀","🏒","⚾","🏈"][i]}</span>{s}</button>)}<button className={league==="Saudi Pro League"?"sport active":"sport"} onClick={()=>{setSport("Football");setLeague("Saudi Pro League");setLiveOnly(false);}}>🇸🇦 Saudi Pro League</button></div>
  <div className="layout"><aside className="side"><p className="label">YOUR SPORTS</p><a className="sideactive" href="#scores"><Activity/> Match centre <i>LIVE</i></a><a href="#competitions"><Trophy/> Competitions</a><a href="#stories"><Tv/> Highlights</a><a href="#scores"><CalendarDays/> Fixtures</a><p className="label extra">QUICK FILTERS</p><a className="fav" href="#scores" onClick={()=>setLiveOnly(true)}><CircleDot size={15}/> Live matches</a><a className="fav" href="#scores" onClick={()=>setLiveOnly(false)}>All matches</a><div className="sidepromo"><Flame/><b>All the action.<br/>One destination.</b><span>Live scores and fixtures from supported competitions around the world.</span></div></aside>
  <section className="main"><div className="heading"><div><span className="kicker"><span className="dot"/> GLOBAL SPORTS CENTRE</span><h1>Scores & Fixtures</h1><p>Follow the action across the world of sport.</p></div><label className="date"><CalendarDays size={17}/><input aria-label="Choose match date" type="date" value={date} onChange={e=>setDate(e.target.value)}/></label></div>
