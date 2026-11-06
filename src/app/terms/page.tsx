@@ -9,24 +9,24 @@ export const metadata: Metadata = {
 
 export default function Terms() {
   return <InfoPage title="Terms of Use" updated={LAST_UPDATED}>
-    <p>By using {SITE_NAME} you agree to these terms.</p>
-    <Section title="Information only">
-      <p>Scores, lineups, statistics, ratings, commentary and broadcaster details are provided for general information. They can be delayed, incomplete or wrong. Please do not rely on them for betting, financial or any other important decision. Always check the official source.</p>
+    <p>Welcome to {SITE_NAME}. By creating an account or using our services, you agree to these terms.</p>
+    <Section title="Your account">
+      <p>You are responsible for keeping your account details secure and for activity carried out through your account. Please provide accurate information and notify us if you believe your account has been accessed without permission.</p>
     </Section>
-    <Section title="Third-party content and links">
-      <p>We link to and embed content from other websites, including YouTube and broadcasters. We do not control that content and are not responsible for it. Streaming services mentioned on this site are separate companies with their own terms and prices.</p>
+    <Section title="Using the platform">
+      <p>Please use {SITE_NAME} lawfully and respectfully. You must not misuse the service, interfere with its operation, attempt unauthorised access or use the platform to harm others.</p>
     </Section>
-    <Section title="Affiliate links">
-      <p>Some links on this site are affiliate links. If you sign up through them we may earn a commission at no extra cost to you.</p>
+    <Section title="Our services">
+      <p>{SITE_NAME} brings sports information and features together to help fans follow the games, teams and competitions they care about. We may improve or update the platform as it develops.</p>
     </Section>
-    <Section title="Trademarks">
-      <p>Names, logos and trademarks of leagues, clubs, federations and broadcasters belong to their owners. {SITE_NAME} is independent and is not affiliated with or endorsed by them.</p>
+    <Section title="Ownership">
+      <p>The {SITE_NAME} name, design and original materials are protected by applicable intellectual property laws. You may not copy or commercially use our original materials without permission.</p>
     </Section>
-    <Section title="No warranty and limit of liability">
-      <p>The site is provided "as is" without promises that it will always be available or error free. To the extent the law allows, we are not liable for any loss that comes from using the site.</p>
+    <Section title="Access to the platform">
+      <p>We aim to provide a reliable service and may carry out updates or maintenance when needed. We may restrict or suspend access where these terms are breached or where necessary to protect the platform and its users.</p>
     </Section>
-    <Section title="Changes">
-      <p>We may change these terms or the site at any time. Continuing to use the site means you accept the updated terms.</p>
+    <Section title="Changes to these terms">
+      <p>We may update these terms from time to time. The latest version will be published on this page.</p>
     </Section>
   </InfoPage>;
 }
