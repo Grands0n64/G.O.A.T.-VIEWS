@@ -1,35 +1,37 @@
 import type { Metadata } from "next";
 import InfoPage, { Section } from "../components/InfoPage";
-import { CONTACT_EMAIL, LAST_UPDATED, SITE_NAME } from "../siteConfig";
 
 export const metadata: Metadata = {
   title: "Privacy Policy – G.O.A.T. VIEWS",
-  description: "How G.O.A.T. VIEWS handles information, cookies and advertising."
+  description: "The privacy policy for G.O.A.T. VIEWS."
 };
 
 export default function Privacy() {
-  return <InfoPage title="Privacy Policy" updated={LAST_UPDATED}>
-    <p>This policy explains what information {SITE_NAME} ("we", "us") handles when you use this website.</p>
-    <Section title="Information we collect">
-      <p>You must create an account or sign in to access the sports features of {SITE_NAME}. Our authentication service, Supabase, processes the information needed to create and secure your account, such as your email address and authentication session. Like any website, our hosting provider may also record technical information such as your IP address, browser type and the pages you visit in its server logs.</p>
-      <p>We use your approximate country, worked out from your IP address, to show the broadcasters that apply where you are. We do not store it.</p>
-    </Section>
-    <Section title="Cookies and advertising">
-      <p>We may show ads provided by Google AdSense and other advertising partners. These partners may use cookies and similar technologies to show ads based on your visits to this and other websites. You can manage personalised advertising at https://adssettings.google.com and read how Google uses data from sites that use its services at https://policies.google.com/technologies/ads.</p>
-      <p>If you visit from the European Economic Area, the United Kingdom or Switzerland, you will be asked for your consent before personalised ads are shown, and you can change your choice later.</p>
-    </Section>
-    <Section title="Third-party content and links">
-      <p>Match pages can include videos embedded from YouTube. When you play a video, YouTube may set cookies and collect data under Google's privacy policy (https://policies.google.com/privacy). Player photos are loaded from Wikipedia and TheSportsDB.</p>
-      <p>Our "Where to watch" buttons link to other websites, some through affiliate links. Those sites have their own privacy policies, and we are not responsible for them. If you click an affiliate link, the other site may place a cookie so that it knows you came from us.</p>
-    </Section>
-    <Section title="Your rights">
-      <p>Depending on where you live, you may have the right to ask what information we hold about you, to have it corrected or deleted, and to object to how it is used. To make a request, contact us{CONTACT_EMAIL ? <> at <a href={`mailto:${CONTACT_EMAIL}`} style={{ color: "#b5f34a" }}>{CONTACT_EMAIL}</a></> : " through the Contact page"}.</p>
-    </Section>
-    <Section title="Children">
-      <p>{SITE_NAME} is not directed at children under 13, and we do not knowingly collect information from them.</p>
-    </Section>
-    <Section title="Changes to this policy">
-      <p>We may update this policy from time to time. The date at the top shows when it was last changed.</p>
-    </Section>
-  </InfoPage>;
+  return (
+    <InfoPage title="Privacy Policy" updated="November 6, 2026">
+      <p>G.O.A.T. VIEWS respects your privacy. This policy explains how personal information is handled when you use our website and services.</p>
+      <Section title="Information you provide">
+        <p>When you create an account or contact us, you may provide information such as your email address and the details of your message. We use this information to provide our services, manage your account and respond to your enquiries.</p>
+      </Section>
+      <Section title="How we use information">
+        <p>We use relevant information to operate and improve G.O.A.T. VIEWS, maintain account security, provide support and meet our legal obligations.</p>
+      </Section>
+      <Section title="Website preferences">
+        <p>Our website may use cookies and similar technologies to support essential features, remember preferences and improve your experience. You can manage cookies through your browser settings.</p>
+      </Section>
+      <Section title="Your information and choices">
+        <p>You may contact us to ask about the personal information associated with your account or to request that it be corrected or deleted, subject to applicable legal requirements.</p>
+        <p>For privacy enquiries, email <a href="mailto:g.o.a.t.views.offical@gmail.com" style={{ color: "#b5f34a" }}>g.o.a.t.views.offical@gmail.com</a>.</p>
+      </Section>
+      <Section title="Keeping information secure">
+        <p>We take reasonable steps to protect personal information and retain it only for as long as it is needed for legitimate service or legal purposes.</p>
+      </Section>
+      <Section title="Children's privacy">
+        <p>G.O.A.T. VIEWS is not intended for children under 13. We do not knowingly collect personal information from children under 13.</p>
+      </Section>
+      <Section title="Updates to this policy">
+        <p>We may update this policy from time to time. The latest version will be published on this page.</p>
+      </Section>
+    </InfoPage>
+  );
 }
