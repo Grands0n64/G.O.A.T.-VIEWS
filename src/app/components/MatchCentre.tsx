@@ -186,17 +186,44 @@ function sideRank(pos: string): number { // -1 = team's left, 1 = team's right
 }
 function formationRows(starters: any[], formation: string, isHome: boolean): any[][] {
   const parts = formation.split("-").map((n) => Number.parseInt(n, 10)).filter((n) => n > 0);
+  const validFormation = parts.length > 0 && parts.reduce((a, b) => a + b, 0) === 10 && starters.length === 11;
+
+  // Prefer the provider's explicit formation slot. It is the closest thing to the
+  // published starting-XI layout and avoids guessing rows from broad position labels.
+  const slots = starters.map((p) => p.place);
+  const hasReliableSlots =
+    validFormation &&
+    slots.every((slot: number) => Number.isInteger(slot) && slot >= 1 && slot <= 11) &&
+    new Set(slots).size === 11;
+
+  if (hasReliableSlots) {
+    const ordered = [...starters].sort((a, b) => a.place - b.place);
+    const rows: any[][] = [ordered.slice(0, 1)];
+    let cursor = 1;
+    for (const count of parts) {
+      rows.push(ordered.slice(cursor, cursor + count));
+      cursor += count;
+    }
+    return rows;
+  }
+
+  // If the feed omits usable formation slots, fall back to positions.
   const backs = parts[0] ?? 0;
   const items = starters.map((p) => ({ p, level: levelOf(p.pos) }));
   if (backs && items.filter((x) => x.level === 1).length > backs) {
-    items.forEach((x) => { if (x.level === 1 && !/^(CD|SW)/i.test(x.p.pos)) x.level = 3; }); // wing-backs
+    items.forEach((x) => { if (x.level === 1 && !/^(CD|SW)/i.test(x.p.pos)) x.level = 3; });
   }
-  const order = (a: any, b: any) => (isHome ? sideRank(b.pos) - sideRank(a.pos) : sideRank(a.pos) - sideRank(b.pos)) || a.place - b.place;
+  const order = (a: any, b: any) =>
+    (isHome ? sideRank(b.pos) - sideRank(a.pos) : sideRank(a.pos) - sideRank(b.pos)) ||
+    (a.place || 99) - (b.place || 99);
   const sorted = items.sort((a, b) => a.level - b.level || order(a.p, b.p)).map((x) => x.p);
-  if (!parts.length || parts.reduce((a, b) => a + b, 0) !== sorted.length - 1 || levelOf(sorted[0].pos) !== 0) return [sorted];
+  if (!validFormation || sorted.length !== 11 || levelOf(sorted[0]?.pos ?? "") !== 0) return [sorted];
   const rows: any[][] = [sorted.slice(0, 1)];
-  let i = 1;
-  for (const n of parts) { rows.push(sorted.slice(i, i + n).sort(order)); i += n; }
+  let cursor = 1;
+  for (const count of parts) {
+    rows.push(sorted.slice(cursor, cursor + count).sort(order));
+    cursor += count;
+  }
   return rows;
 }
 
@@ -207,13 +234,21 @@ function collectStats(teams: any[], homeId: string) {
   const right = teams.find((t: any) => t !== left) ?? teams[1];
   const leftStats = asArray(left.statistics ?? left.stats);
   const rightStats = asArray(right.statistics ?? right.stats);
-  return leftStats.map((item: any) => {
-    const key = item.name ?? item.abbreviation ?? item.label;
-    const other = rightStats.find((c: any) => (c.name ?? c.abbreviation ?? c.label) === key);
-    const h = safeText(item.displayValue ?? item.value, "—");
-    const a = safeText(other?.displayValue ?? other?.value, "—");
-    return { name: label(item.label ?? item.name ?? item.abbreviation), home: h, away: a, h: num(h), a: num(a) };
-  }).filter((row: any) => row.name && row.home !== "—");
+  const keyOf = (item: any) => String(item.name ?? item.abbreviation ?? item.label ?? "");
+  const allKeys = [...new Set([...leftStats, ...rightStats].map(keyOf).filter(Boolean))];
+  return allKeys.map((key) => {
+    const homeItem = leftStats.find((item: any) => keyOf(item) === key);
+    const awayItem = rightStats.find((item: any) => keyOf(item) === key);
+    const homeValue = safeText(homeItem?.displayValue ?? homeItem?.value, "—");
+    const awayValue = safeText(awayItem?.displayValue ?? awayItem?.value, "—");
+    return {
+      name: label(homeItem?.label ?? awayItem?.label ?? key),
+      home: homeValue,
+      away: awayValue,
+      h: num(homeValue),
+      a: num(awayValue)
+    };
+  }).filter((row) => row.name && (row.home !== "—" || row.away !== "—"));
 }
 
 /* ---------- small components ---------- */
