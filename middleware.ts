@@ -7,8 +7,8 @@ export async function middleware(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Keep Supabase session cookies fresh when auth is configured,
-  // but never block public sports pages when a visitor is signed out.
+  // Refresh Supabase session cookies when configured, but never block
+  // visitors from browsing public sports pages without signing in.
   if (supabaseUrl && supabaseAnonKey) {
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
       cookies: {
